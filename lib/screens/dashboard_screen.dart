@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'notification_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,6 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   double _currentPrice = 0.0;
   final NumberFormat _currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
   bool _isLoading = true;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -133,8 +135,20 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       elevation: 0,
       title: const Text('Dashboard', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
       actions: [
-        IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: () {}),
-        IconButton(icon: const Icon(Icons.notifications_none, color: Colors.white), onPressed: () {}),
+        IconButton(
+          icon: const Icon(Icons.search, color: Colors.white), 
+          onPressed: () {},
+        ),
+        IconButton(
+          icon: const Icon(Icons.notifications_none, color: Colors.white), 
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const NotificationScreen(),
+              ),
+            );
+          },
+        ),
         const SizedBox(width: 8),
         Container(
           width: 35, height: 35,
@@ -150,11 +164,14 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     return Center(
       child: Column(
         children: [
-          Text('$_selectedCrypto Price', style: const TextStyle(color: Color(0xFF6C7278), fontSize: 14)),
+          const Text(
+            'Wallet Balance',
+            style: TextStyle(color: Color(0xFF6C7278), fontSize: 14),
+          ),
           const SizedBox(height: 8),
-          Text(
-            _currencyFormat.format(_currentPrice),
-            style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+          const Text(
+            '\$45,678.00',
+            style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -177,20 +194,122 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   Widget _buildActionButton(String path) {
-    return Container(
-      width: 72, // Increased size
-      height: 72, // Increased size
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E20),
-        borderRadius: BorderRadius.circular(20),
-      ),
+    return GestureDetector(
+      onTap: () {
+        _handleActionTap(path);
+      },
       child: Center(
         child: Image.asset(
           path,
-          width: 32, // Slightly larger icon
-          height: 32,
-          errorBuilder: (context, error, stackTrace) => const Icon(Icons.star, color: Colors.white),
+          width: 64, // Much larger icon
+          height: 64,
+          errorBuilder: (context, error, stackTrace) => const Icon(Icons.star, color: Colors.white, size: 64),
         ),
+      ),
+    );
+  }
+
+  void _handleActionTap(String path) {
+    switch (path) {
+      case 'assets/images/send.png':
+        // Navigate to Send screen
+        break;
+      case 'assets/images/request.png':
+        // Navigate to Request screen
+        break;
+      case 'assets/images/withdraw.png':
+        // Navigate to Withdraw screen
+        break;
+      case 'assets/images/more.png':
+        _showMoreOptions(context);
+        break;
+    }
+  }
+
+  void _showMoreOptions(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.6,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'More',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: GridView.count(
+                    crossAxisCount: 4,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1,
+                    children: [
+                      _moreOptionItem('Send', 'assets/images/send.png'),
+                      _moreOptionItem('Request', 'assets/images/request.png'),
+                      _moreOptionItem('Withdraw', 'assets/images/withdraw.png'),
+                      _moreOptionItem('Add wallet', 'assets/images/addwallet.png'),
+                      _moreOptionItem('Deposit', 'assets/images/deposit.png'),
+                      _moreOptionItem('Edit Wallet', 'assets/images/editwallet.png'),
+                      _moreOptionItem('Buy Crypto', 'assets/images/buycrpto.png'),
+                      _moreOptionItem('Sell Crypto', 'assets/images/sellcrypto.png'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _moreOptionItem(String label, String assetPath) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).pop();
+        // Handle individual option tap
+      },
+      child: Image.asset(
+        assetPath,
+        width: 56,
+        height: 56,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(
+            Icons.help_outline,
+            color: Colors.white,
+            size: 56,
+          );
+        },
       ),
     );
   }
@@ -228,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E20),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,24 +455,91 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navItem(Icons.dashboard, 'Home', true),
-          _navItem(Icons.account_balance_wallet_outlined, 'Wallet', false),
-          _navItem(Icons.pie_chart_outline, 'Stats', false),
-          _navItem(Icons.settings_outlined, 'Settings', false),
+          _navItem('assets/images/home.png', 'Home', 0),
+          _navItem('assets/images/market.png', 'Market', 1),
+          _navItem('assets/images/bot.png', 'Bot Trade', 2),
+          _navItem('assets/images/spot.png', 'Spot', 3),
+          _navItem('assets/images/wallet.png', 'Wallet', 4),
         ],
       ),
     );
   }
 
-  Widget _navItem(IconData icon, String label, bool active) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: active ? const Color(0xFF84BD00) : const Color(0xFF6C7278)),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(color: active ? const Color(0xFF84BD00) : const Color(0xFF6C7278), fontSize: 10)),
-      ],
+  Widget _navItem(String iconPath, String label, int index) {
+    final bool isActive = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedIndex = index;
+        });
+        _handleNavigation(index);
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isActive)
+            Container(
+              width: 30,
+              height: 3,
+              decoration: const BoxDecoration(
+                color: Color(0xFF84BD00),
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(2)),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Image.asset(
+            iconPath,
+            width: 48,
+            height: 48,
+            color: isActive ? const Color(0xFF84BD00) : const Color(0xFF6C7278),
+            errorBuilder: (context, error, stackTrace) {
+              return Icon(
+                _getFallbackIcon(label),
+                color: isActive ? const Color(0xFF84BD00) : const Color(0xFF6C7278),
+                size: 48,
+              );
+            },
+          ),
+        ],
+      ),
     );
+  }
+
+  void _handleNavigation(int index) {
+    switch (index) {
+      case 0: // Home
+        // Already on Dashboard
+        break;
+      case 1: // Market
+        // Navigate to Market screen
+        break;
+      case 2: // Bot Trade
+        // Navigate to Bot Trade screen
+        break;
+      case 3: // Spot
+        // Navigate to Spot screen
+        break;
+      case 4: // Wallet
+        // Navigate to Wallet screen
+        break;
+    }
+  }
+
+  IconData _getFallbackIcon(String label) {
+    switch (label) {
+      case 'Home':
+        return Icons.home;
+      case 'Market':
+        return Icons.store;
+      case 'Bot Trade':
+        return Icons.smart_toy;
+      case 'Spot':
+        return Icons.show_chart;
+      case 'Wallet':
+        return Icons.account_balance_wallet;
+      default:
+        return Icons.circle;
+    }
   }
 }
 
