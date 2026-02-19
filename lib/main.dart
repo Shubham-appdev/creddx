@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/splash_screen.dart';
+import 'main_navigation.dart';
 
 void main() {
   runApp(const CreddXApp());
@@ -24,7 +24,7 @@ class CreddXApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Inter', // Assuming standard Inter font as in many designs
       ),
-      home: const SplashScreen(),
+      home: const MainNavigation(),
     );
   }
 }
