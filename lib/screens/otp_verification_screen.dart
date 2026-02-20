@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dashboard_screen.dart';
+import '../main_navigation.dart';
+import '../services/auth_service.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({super.key});
@@ -13,6 +14,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   int _focusedIndex = 0;
+  bool _isLoading = false;
+  bool _isResending = false;
 
   @override
   void initState() {
@@ -43,6 +46,98 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       node.dispose();
     }
     super.dispose();
+  }
+
+  String get _otp {
+    return _controllers.map((controller) => controller.text).join();
+  }
+
+  bool get _isOtpComplete {
+    return _controllers.every((controller) => controller.text.isNotEmpty);
+  }
+
+  Future<void> _verifyOtp() async {
+    if (!_isOtpComplete) {
+      _showError('Please enter all 6 digits');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await AuthService.verifyOtp(_otp);
+
+      if (result['success']) {
+        _showSuccess('OTP verified successfully!');
+        // Navigate to main navigation with bottom nav bar after successful OTP verification
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainNavigation()),
+        );
+      } else {
+        _showError(result['message']);
+      }
+    } catch (e) {
+      _showError('An error occurred during OTP verification');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _resendOtp() async {
+    setState(() {
+      _isResending = true;
+    });
+
+    try {
+      final result = await AuthService.resendOtp();
+
+      if (result['success']) {
+        _showSuccess('OTP resent successfully!');
+        // Clear OTP fields
+        for (var controller in _controllers) {
+          controller.clear();
+        }
+        // Focus on first field
+        _focusNodes[0].requestFocus();
+      } else {
+        _showError(result['message']);
+      }
+    } catch (e) {
+      _showError('Failed to resend OTP');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFE74C3C),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFF84BD00),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -108,13 +203,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     ),
                     const SizedBox(height: 8),
                     GestureDetector(
-                      onTap: () {
-                        // Handle resend code
-                      },
-                      child: const Text(
-                        'Resend Code',
+                      onTap: _isResending ? null : _resendOtp,
+                      child: Text(
+                        _isResending ? 'Sending...' : 'Resend Code',
                         style: TextStyle(
-                          color: Color(0xFF84BD00),
+                          color: _isResending ? Colors.grey : const Color(0xFF84BD00),
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),
@@ -130,19 +223,23 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const DashboardScreen()),
-                    );
-                  },
+                  onPressed: _isLoading ? null : _verifyOtp,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF84BD00),
+                    backgroundColor: _isLoading ? Colors.grey : const Color(0xFF84BD00),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
-                  child: const Text('Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: _isLoading
+                      ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text('Verify', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 40),

@@ -99,11 +99,16 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
-      appBar: _buildAppBar(),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFF84BD00)))
+    return WillPopScope(
+      onWillPop: () async {
+        // Close the app when back button is pressed
+        return true; // Allow back press to close the app
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D0D0D),
+        appBar: _buildAppBar(),
+      body: _isLoading ? 
+        const Center(child: CircularProgressIndicator(color: Color(0xFF84BD00)))
         : SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: Column(
@@ -123,6 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               ],
             ),
           ),
+        ),
     );
   }
 

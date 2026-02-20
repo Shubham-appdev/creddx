@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'otp_verification_screen.dart';
+import '../services/auth_service.dart';
+import '../main_navigation.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -9,13 +10,11 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  final TextEditingController _referralController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
+  bool _isLoading = false;
+  bool _otpSent = false;
 
   @override
   void initState() {
@@ -24,12 +23,103 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _referralController.dispose();
+    _otpController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleRegister() async {
+    if (_emailController.text.isEmpty) {
+      _showError('Please enter your email');
+      return;
+    }
+
+    if (!_otpSent) {
+      // Step 1: Send OTP
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final result = await AuthService.signupSendOtp(_emailController.text.trim());
+
+        if (result['success']) {
+          _showSuccess('OTP sent to your email!');
+          setState(() {
+            _otpSent = true;
+          });
+        } else {
+          _showError(result['message']);
+        }
+      } catch (e) {
+        _showError('Failed to send OTP');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } else {
+      // Step 2: Complete signup with OTP
+      if (_otpController.text.isEmpty) {
+        _showError('Please enter the OTP');
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final result = await AuthService.signupWithOtp(
+          _emailController.text.trim(),
+          _otpController.text.trim(),
+          referralCode: _referralController.text.trim().isEmpty ? null : _referralController.text.trim(),
+        );
+
+        if (result['success']) {
+          _showSuccess('Registration successful!');
+          // Navigate to main navigation with bottom nav bar and clear all previous screens
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const MainNavigation()),
+            (Route<dynamic> route) => false,
+          );
+        } else {
+          _showError(result['message']);
+        }
+      } catch (e) {
+        _showError('Registration failed');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFE74C3C),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFF84BD00),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -75,59 +165,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: TextStyle(fontSize: 16, color: Color(0xFF6C7278)),
                 ),
                 const SizedBox(height: 32),
-                const Text('Full name', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
-                const SizedBox(height: 8),
-                _buildTextField(controller: _nameController, icon: Icons.person_outline),
-                const SizedBox(height: 24),
                 const Text('Email', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
                 const SizedBox(height: 8),
                 _buildTextField(controller: _emailController, icon: Icons.email_outlined),
                 const SizedBox(height: 24),
-                const Text('Phone Number', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
+                const Text('Referral Code (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
                 const SizedBox(height: 8),
-                _buildTextField(controller: _phoneController, icon: Icons.phone_outlined, keyboardType: TextInputType.phone),
-                const SizedBox(height: 24),
-                const Text('Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _passwordController,
-                  icon: Icons.lock_outline,
-                  obscure: _obscurePassword,
-                  suffix: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF6C7278)),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text('Repeat Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _confirmPasswordController,
-                  icon: Icons.lock_outline,
-                  obscure: _obscureConfirmPassword,
-                  suffix: IconButton(
-                    icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF6C7278)),
-                    onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-                  ),
-                ),
+                _buildTextField(controller: _referralController, icon: Icons.card_giftcard_outlined),
+                if (_otpSent) ...[
+                  const SizedBox(height: 24),
+                  const Text('OTP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
+                  const SizedBox(height: 8),
+                  _buildTextField(controller: _otpController, icon: Icons.lock_outline),
+                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const OtpVerificationScreen()),
-                      );
-                    },
+                    onPressed: _isLoading ? null : _handleRegister,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF84BD00),
+                      backgroundColor: _isLoading ? Colors.grey : const Color(0xFF84BD00),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
-                    child: const Text('Register', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(_otpSent ? 'Complete Signup' : 'Send OTP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
                 ),
                 const SizedBox(height: 40),

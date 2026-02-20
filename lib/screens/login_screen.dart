@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'register_screen.dart';
-import 'forgot_password_screen.dart';
-import 'dashboard_screen.dart';
+import '../main_navigation.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,21 +12,113 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _obscurePassword = true;
+  final TextEditingController _otpController = TextEditingController();
+  bool _isLoading = false;
+  bool _otpSent = false;
 
   @override
   void initState() {
     super.initState();
     _emailController.text = 'yourname@gmail.com';
-    _passwordController.text = '********';
   }
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
+    _otpController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (_emailController.text.isEmpty) {
+      _showError('Please enter your email');
+      return;
+    }
+
+    if (!_otpSent) {
+      // Step 1: Send OTP
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final result = await AuthService.loginSendOtp(_emailController.text.trim());
+
+        if (result['success']) {
+          _showSuccess('OTP sent to your email!');
+          setState(() {
+            _otpSent = true;
+            _isLoading = false;
+          });
+        } else {
+          _showError(result['message']);
+        }
+      } catch (e) {
+        _showError('Failed to send OTP');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } else {
+      // Step 2: Verify OTP and login
+      if (_otpController.text.isEmpty) {
+        _showError('Please enter the OTP');
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final result = await AuthService.loginWithOtp(
+          _emailController.text.trim(),
+          _otpController.text.trim(),
+        );
+
+        if (result['success']) {
+          _showSuccess('Login successful!');
+          // Navigate to main navigation with bottom nav bar on successful login
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MainNavigation()),
+          );
+        } else {
+          _showError(result['message']);
+        }
+      } catch (e) {
+        _showError('Login failed');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFE74C3C),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFF84BD00),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -77,56 +169,70 @@ class _LoginScreenState extends State<LoginScreen> {
                 _buildTextField(
                   controller: _emailController,
                   prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF6C7278)),
+                  enabled: !_otpSent, // Disable email field after OTP is sent
                 ),
-                const SizedBox(height: 24),
-                const Text('Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _passwordController,
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Image.asset(
-                      'assets/images/key.png',
-                      width: 20,
-                      height: 20,
-                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.lock_outline, color: Color(0xFF6C7278)),
+                if (_otpSent) ...[
+                  const SizedBox(height: 24),
+                  const Text('OTP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white)),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _otpController,
+                    prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF6C7278)),
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: _isLoading ? null : () async {
+                        setState(() {
+                          _isLoading = true;
+                        });
+                        
+                        try {
+                          final result = await AuthService.loginSendOtp(_emailController.text.trim());
+                          if (result['success']) {
+                            _showSuccess('OTP resent successfully!');
+                          } else {
+                            _showError(result['message']);
+                          }
+                        } catch (e) {
+                          _showError('Failed to resend OTP');
+                        } finally {
+                          if (mounted) {
+                            setState(() {
+                              _isLoading = false;
+                            });
+                          }
+                        }
+                      },
+                      child: Text('Resend OTP', style: TextStyle(color: _isLoading ? Colors.grey : const Color(0xFF84BD00), fontWeight: FontWeight.w500)),
                     ),
                   ),
-                  obscure: _obscurePassword,
-                  suffix: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF6C7278)),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()));
-                    },
-                    child: const Text('Forgot Password ?', style: TextStyle(color: Color(0xFF84BD00), fontWeight: FontWeight.w500)),
-                  ),
-                ),
+                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Navigate to dashboard after successful login
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-                      );
-                    },
+                    onPressed: _isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF84BD00),
+                      backgroundColor: _isLoading ? Colors.grey : const Color(0xFF84BD00),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
-                    child: const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(_otpSent ? 'Verify OTP' : 'Send OTP', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -143,10 +249,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 56,
                   child: OutlinedButton(
                     onPressed: () {
-                      // Navigate to dashboard after Google login
+                      // Navigate to main navigation after Google login
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+                        MaterialPageRoute(builder: (context) => const MainNavigation()),
                       );
                     },
                     style: OutlinedButton.styleFrom(
@@ -201,7 +307,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, Widget? prefixIcon, bool obscure = false, Widget? suffix}) {
+  Widget _buildTextField({required TextEditingController controller, Widget? prefixIcon, bool obscure = false, Widget? suffix, bool enabled = true, TextInputType? keyboardType, int? maxLength}) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E20),
@@ -211,12 +317,16 @@ class _LoginScreenState extends State<LoginScreen> {
       child: TextField(
         controller: controller,
         obscureText: obscure,
+        enabled: enabled,
+        keyboardType: keyboardType,
+        maxLength: maxLength,
         style: const TextStyle(color: Colors.white, fontSize: 16),
         decoration: InputDecoration(
           prefixIcon: prefixIcon,
           suffixIcon: suffix,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          counterText: '', // Hide character counter
         ),
       ),
     );
