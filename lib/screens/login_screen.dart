@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'register_screen.dart';
 import '../main_navigation.dart';
 import '../services/auth_service.dart';
@@ -15,6 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _otpController = TextEditingController();
   bool _isLoading = false;
   bool _otpSent = false;
+  int _resendTimer = 0;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -26,7 +29,24 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _otpController.dispose();
+    _timer?.cancel();
     super.dispose();
+  }
+
+  // Start resend timer
+  void _startResendTimer() {
+    setState(() {
+      _resendTimer = 30; // 30 seconds countdown
+    });
+    
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _resendTimer--;
+        if (_resendTimer <= 0) {
+          timer.cancel();
+        }
+      });
+    });
   }
 
   Future<void> _handleLogin() async {
@@ -191,14 +211,22 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
                         
                         try {
-                          final result = await AuthService.loginSendOtp(_emailController.text.trim());
+                          print('=== LOGIN SCREEN RESEND OTP ===');
+                          print('Email: ${_emailController.text.trim()}');
+                          
+                          final result = await AuthService.resendOtp(_emailController.text.trim());
+                          print('Result: $result');
+                          print('================================');
+                          
                           if (result['success']) {
-                            _showSuccess('OTP resent successfully!');
-                          } else {
-                            _showError(result['message']);
-                          }
+                          _showSuccess(result['message'] ?? 'OTP resent successfully!');
+                          _startResendTimer(); // Start countdown timer
+                        } else {
+                          _showError(result['error'] ?? 'Failed to resend OTP');
+                        }
                         } catch (e) {
-                          _showError('Failed to resend OTP');
+                          print('Login Screen Exception: $e');
+                          _showError('Failed to resend OTP: $e');
                         } finally {
                           if (mounted) {
                             setState(() {
@@ -207,7 +235,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           }
                         }
                       },
-                      child: Text('Resend OTP', style: TextStyle(color: _isLoading ? Colors.grey : const Color(0xFF84BD00), fontWeight: FontWeight.w500)),
+                      child: Text(
+                        _resendTimer > 0 
+                            ? 'Resend OTP (${_resendTimer}s)'
+                            : 'Resend OTP', 
+                        style: TextStyle(
+                          color: _isLoading || _resendTimer > 0 
+                              ? Colors.grey 
+                              : const Color(0xFF84BD00), 
+                          fontWeight: FontWeight.w500
+                        )
+                      ),
                     ),
                   ),
                 ],
