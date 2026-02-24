@@ -67,7 +67,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     try {
-      final result = await AuthService.verifyOtp(_otp);
+      final result = await AuthService.loginWithOtp('user@example.com', _otp);
 
       if (result['success']) {
         _showSuccess('OTP verified successfully!');
@@ -96,7 +96,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     try {
-      final result = await AuthService.resendOtp();
+      final result = await AuthService.resendOtp('user@example.com');
 
       if (result['success']) {
         _showSuccess('OTP resent successfully!');

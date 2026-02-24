@@ -73,10 +73,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       try {
-        final result = await AuthService.signupWithOtp(
+        final result = await AuthService.completeSignupWithOtp(
           _emailController.text.trim(),
           _otpController.text.trim(),
-          referralCode: _referralController.text.trim().isEmpty ? null : _referralController.text.trim(),
+          referralCode: _referralController.text.trim().isNotEmpty ? _referralController.text.trim() : null,
         );
 
         if (result['success']) {

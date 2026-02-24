@@ -1,0 +1,54 @@
+class AppStrings {
+  static const String selectTradingPair = 'Select Trading Pair';
+  static const String cancel = 'Cancel';
+  static const String live = 'Live';
+  static const String offline = 'Offline';
+  static const String spot = 'Spot';
+  static const String convert = 'Convert';
+  static const String chainSpot = 'ChainSpot';
+  static const String preMarket = 'Pre-Market';
+  static const String hHigh = '24h High';
+  static const String hLow = '24h Low';
+  static const String hChange = '24h Change';
+  static const String hVolume = '24h Volume';
+  static const String limit = 'Limit';
+  static const String market = 'Market';
+  static const String price = 'Price';
+  static const String marketPrice = 'Market Price';
+  static const String amount = 'Amount';
+  static const String available = 'Available';
+  static const String tradingFee = 'Trading Fee';
+  static const String total = 'Total';
+  static const String buyBTC = 'Buy BTC';
+  static const String sellBTC = 'Sell BTC';
+  static const String buy = 'Buy';
+  static const String sell = 'Sell';
+  static const String orderBook = 'Order Book';
+  static const String top5 = 'Top 5';
+  static const String recentTrades = 'Recent Trades';
+  static const String viewAll = 'View All';
+  static const String openOrders = 'Open Orders';
+  static const String all = 'All';
+  static const String noOpenOrders = 'No open orders';
+  static const String placeOrderToSee = 'Place an order to see it here';
+  static const String filled = 'Filled';
+  static const String orderFilledSuccess = 'Order filled successfully!';
+  static const String dataRefreshedSuccess = 'Data refreshed successfully!';
+  static const String unknown = 'Unknown';
+
+  // Dashboard Strings
+  static const String walletBalance = 'Wallet Balance';
+  static const String addressCopied = 'Address copied to clipboard';
+  static const String send = 'Send';
+  static const String request = 'Request';
+  static const String deposit = 'Deposit';
+  static const String more = 'More';
+  static const String exchangeHistory = 'Exchange History';
+  static const String transactionHistory = 'Transaction History';
+  static const String moreOptions = 'More Options';
+  static const String withdraw = 'Withdraw';
+  static const String history = 'History';
+  static const String settings = 'Settings';
+  static const String help = 'Help';
+  static const String comingSoon = ' coming soon!';
+}
