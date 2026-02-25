@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'onboarding_screen.dart';
+import '../main_navigation.dart';
+import '../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -47,27 +49,54 @@ class _SplashScreenState extends State<SplashScreen>
     // Start animation
     _fadeController.forward();
     
-    // Navigate to onboarding after delay (Reduced to 2 seconds)
-    Timer(const Duration(seconds: 2), () {
+    // Navigate after delay (Reduced to 2 seconds)
+    Timer(const Duration(seconds: 2), () async {
       if (mounted) {
         try {
-          Navigator.of(context).pushReplacement(
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => 
-                  const OnboardingScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return SlideTransition(
-                  position: animation.drive(
-                    Tween(begin: const Offset(0.0, 1.0), end: Offset.zero),
-                  ),
-                  child: child,
-                );
-              },
-              transitionDuration: const Duration(milliseconds: 600),
-            ),
-          );
+          // Check if user is already logged in
+          final isLoggedIn = await AuthService.isLoggedIn();
+          
+          if (isLoggedIn) {
+            // User is logged in, go to main navigation with bottom nav bar
+            Navigator.of(context).pushReplacement(
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) => 
+                    const MainNavigation(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position: animation.drive(
+                      Tween(begin: const Offset(0.0, 1.0), end: Offset.zero),
+                    ),
+                    child: child,
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 600),
+              ),
+            );
+          } else {
+            // User is not logged in, go to onboarding
+            Navigator.of(context).pushReplacement(
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) => 
+                    const OnboardingScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position: animation.drive(
+                      Tween(begin: const Offset(0.0, 1.0), end: Offset.zero),
+                    ),
+                    child: child,
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 600),
+              ),
+            );
+          }
         } catch (e) {
           debugPrint('Navigation error: $e');
+          // Fallback to onboarding if there's an error
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+          );
         }
       }
     });

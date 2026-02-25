@@ -16,6 +16,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   int _focusedIndex = 0;
   bool _isLoading = false;
   bool _isResending = false;
+  
+  // TODO: This should be passed as a parameter from the previous screen
+  // Currently hardcoded to 'user@example.com' which will cause issues
+  static const String _email = 'user@example.com';
 
   @override
   void initState() {
@@ -67,7 +71,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     try {
-      final result = await AuthService.loginWithOtp('user@example.com', _otp);
+      final result = await AuthService.loginWithOtp(_email, _otp);
 
       if (result['success']) {
         _showSuccess('OTP verified successfully!');
@@ -96,7 +100,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     try {
-      final result = await AuthService.resendOtp('user@example.com');
+      final result = await AuthService.resendOtp(_email);
 
       if (result['success']) {
         _showSuccess('OTP resent successfully!');

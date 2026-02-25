@@ -211,22 +211,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
                         
                         try {
-                          print('=== LOGIN SCREEN RESEND OTP ===');
-                          print('Email: ${_emailController.text.trim()}');
-                          
                           final result = await AuthService.resendOtp(_emailController.text.trim());
-                          print('Result: $result');
-                          print('================================');
-                          
                           if (result['success']) {
-                          _showSuccess(result['message'] ?? 'OTP resent successfully!');
-                          _startResendTimer(); // Start countdown timer
-                        } else {
-                          _showError(result['error'] ?? 'Failed to resend OTP');
-                        }
+                            _showSuccess(result['message'] ?? 'OTP resent successfully!');
+                            _startResendTimer();
+                          } else {
+                            _showError(result['error'] ?? 'Failed to resend OTP');
+                          }
                         } catch (e) {
-                          print('Login Screen Exception: $e');
-                          _showError('Failed to resend OTP: $e');
+                          _showError('Failed to resend OTP');
                         } finally {
                           if (mounted) {
                             setState(() {
@@ -273,53 +266,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         : Text(_otpSent ? 'Verify OTP' : 'Send OTP', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
-                    const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('Or', style: TextStyle(color: Color(0xFF6C7278)))),
-                    Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      // Navigate to main navigation after Google login
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const MainNavigation()),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E1E20),
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          'assets/images/logogoogle.png',
-                          width: 24,
-                          height: 24,
-                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata, color: Colors.white, size: 32),
-                        ),
-                        const SizedBox(width: 12),
-                        const Flexible(
-                          child: Text(
-                            'Login with Google',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 40),
                 Center(
                   child: Wrap(
@@ -364,7 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
           suffixIcon: suffix,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 16),
-          counterText: '', // Hide character counter
+          counterText: '',
         ),
       ),
     );
