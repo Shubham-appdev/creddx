@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'notification_screen.dart';
 import 'send_screen.dart';
 import 'receive_screen.dart';
+import 'deposit_screen.dart';
 import 'withdraw_screen.dart';
-import 'deposit_screen.dart'; // Import the new DepositScreen
+import 'inr_deposit_screen.dart';
+import 'inr_withdraw_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,31 +18,13 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   String _selectedTab = 'Exchange History';
   final List<String> _tabs = ['Exchange History', 'Transaction History'];
-  final NumberFormat _currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+  final String _walletAddress = '0x1234...5678';
 
-  // Mock wallet data
-  final String _walletAddress = '0×2340....3420';
-  final double _totalBalance = 227169.85;
-
-  // Crypto holdings
   final List<Map<String, dynamic>> _cryptoHoldings = [
-    {
-      'symbol': 'BTC',
-      'name': 'Bitcoin',
-      'amount': 0.34545,
-      'usdValue': 21900.84,
-      'icon': 'btc.png',
-    },
-    {
-      'symbol': 'ETH',
-      'name': 'Ethereum',
-      'amount': 12345.0,
-      'usdValue': 37870.88,
-      'icon': 'eth.png',
-    },
+    {'symbol': 'BTC', 'name': 'Bitcoin', 'amount': '0.5234', 'value': '\$24,560.12', 'change': '+2.5%'},
+    {'symbol': 'ETH', 'name': 'Ethereum', 'amount': '12.5', 'value': '\$32,120.45', 'change': '-1.2%'},
   ];
 
-  // Exchange history data
   final List<Map<String, dynamic>> _exchangeHistory = [
     {
       'from': 'BTC',
@@ -70,16 +53,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0D),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildBalanceSection(),
-            _buildActionButtons(),
-            _buildTabSection(),
-            Expanded(
-              child: _buildContent(),
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildHeader(),
+              _buildBalanceSection(),
+              _buildActionButtons(),
+              _buildTabSection(),
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.4,
+                child: _buildContent(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -103,9 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.search, color: Colors.white, size: 26),
-                onPressed: () {
-                  // Search functionality
-                },
+                onPressed: () {},
               ),
               const SizedBox(width: 8),
               GestureDetector(
@@ -140,9 +124,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
+        const Text(
           '\$227.169,85',
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontSize: 36,
             fontWeight: FontWeight.w700,
@@ -199,40 +183,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildActionButtons() {
-    final actions = [
+    final row1 = [
       {'icon': 'send.png', 'label': 'Send'},
-      {'icon': 'request.png', 'label': 'Request'},
+      {'icon': 'withdraw.png', 'label': 'Request'},
       {'icon': 'deposit.png', 'label': 'Deposit'},
-      {'icon': 'more.png', 'label': 'More'},
+      {'icon': 'inrdeposit.png', 'label': 'INR Deposit'},
+    ];
+    final row2 = [
+      {'icon': 'inrwithdraw.png', 'label': 'INR Withdraw'},
     ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: actions.map((action) {
-          return GestureDetector(
-            onTap: () => _handleActionTap(action['label'] as String),
-            child: SizedBox(
-              width: 70, // Increased to accommodate larger icons
-              height: 70,
-              child: Center(
-                child: Image.asset(
-                  'assets/images/${action['icon']}',
-                  width: 56, // Increased from 48 to 56
-                  height: 56,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.help_outline,
-                    color: Color(0xFF84BD00),
-                    size: 56,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 28),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: row1.map((action) => _buildActionItem(action)).toList(),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: row2.map((action) => _buildActionItem(action)).toList(),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildActionItem(Map<String, String> action) {
+    bool isINRDeposit = action['label'] == 'INR Deposit';
+    bool isINRWithdraw = action['label'] == 'INR Withdraw';
+    double iconSize = (isINRDeposit || isINRWithdraw) ? 40 : 56;
+    
+    return GestureDetector(
+      onTap: () => _handleActionTap(action['label'] as String),
+      child: SizedBox(
+        width: 85,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/images/${action['icon']}',
+              width: iconSize,
+              height: iconSize,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.help_outline,
+                color: const Color(0xFF84BD00),
+                size: iconSize,
+              ),
+            ),
+            if (isINRDeposit) ...[
+              const SizedBox(height: 4),
+              const Text(
+                'INRDeposit',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFFDCE4E8),
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+            if (isINRWithdraw) ...[
+              const SizedBox(height: 4),
+              const Text(
+                'Withdraw INR',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFFDCE4E8),
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleActionTap(String label) {
+    switch (label) {
+      case 'Send':
+        Navigator.of(context).push(MaterialPageRoute(builder: (context) => const SendScreen()));
+        break;
+      case 'Request':
+        Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ReceiveScreen()));
+        break;
+      case 'Deposit':
+        Navigator.of(context).push(MaterialPageRoute(builder: (context) => const DepositScreen()));
+        break;
+      case 'INR Deposit':
+        Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InrDepositScreen()));
+        break;
+      case 'INR Withdraw':
+        Navigator.of(context).push(MaterialPageRoute(builder: (context) => const InrWithdrawScreen()));
+        break;
+    }
   }
 
   Widget _buildTabSection() {
@@ -291,7 +341,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             margin: const EdgeInsets.only(bottom: 16),
             child: Row(
               children: [
-                // Double icon with PNG images
                 SizedBox(
                   width: 52,
                   height: 40,
@@ -407,38 +456,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  crypto['symbol'] as String,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _formatNumber(crypto['amount'] as double),
+                        crypto['name'] as String,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
+                          fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 4),
                       Text(
-                        _currencyFormat.format(crypto['usdValue'] as double),
+                        crypto['symbol'] as String,
                         style: const TextStyle(
                           color: Color(0xFF8E8E93),
-                          fontSize: 12,
+                          fontSize: 13,
                         ),
                       ),
                     ],
                   ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      crypto['value'] as String,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      crypto['change'] as String,
+                      style: TextStyle(
+                        color: (crypto['change'] as String).startsWith('+') 
+                              ? const Color(0xFF00C853) 
+                              : const Color(0xFFE74C3C),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -448,155 +509,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildCryptoIcon(String iconName, double size) {
+  Widget _buildCryptoIcon(String assetName, double size) {
     return Image.asset(
-      'assets/images/$iconName',
+      'assets/images/$assetName',
       width: size,
       height: size,
-      errorBuilder: (context, error, stackTrace) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: iconName.contains('btc')
-                ? const Color(0xFFF7931A).withOpacity(0.2)
-                : const Color(0xFF627EEA).withOpacity(0.2),
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: Text(
-            iconName.contains('btc') ? 'B' : 'E',
-            style: TextStyle(
-              color: iconName.contains('btc')
-                  ? const Color(0xFFF7931A)
-                  : const Color(0xFF627EEA),
-              fontWeight: FontWeight.bold,
-              fontSize: size * 0.4,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _formatNumber(double number) {
-    if (number >= 1000) {
-      return NumberFormat('#,###').format(number);
-    }
-    return number.toString();
-  }
-
-  String _formatCurrency(double value) {
-    return NumberFormat.currency(
-      symbol: '',
-      decimalDigits: 2,
-    ).format(value);
-  }
-
-  void _handleActionTap(String action) {
-    switch (action) {
-      case 'Send':
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => const SendScreen()),
-        );
-        break;
-      case 'Request':
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => const ReceiveScreen()),
-        );
-        break;
-      case 'Deposit':
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => const DepositScreen()),
-        );
-        break;
-      case 'More':
-        _showMoreOptions(context);
-        break;
-    }
-  }
-
-  void _showMoreOptions(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1E1E20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.9,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'More Options',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              GridView.count(
-                shrinkWrap: true,
-                crossAxisCount: 4,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.0,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _moreOptionItem('Withdraw', 'withdraw.png'),
-                  _moreOptionItem('History', 'chart.png'),
-                  _moreOptionItem('Settings', 'more.png'),
-                  _moreOptionItem('Help', 'key.png'),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _moreOptionItem(String label, String assetPath) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).pop();
-        if (label == 'Withdraw') {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const WithdrawScreen()),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$label coming soon!')),
-          );
-        }
-      },
-      child: Center(
-        child: Image.asset(
-          'assets/images/$assetPath',
-          width: 56, // Increased from 48 to 56
-          height: 56,
-          errorBuilder: (context, error, stackTrace) => const Icon(
-            Icons.help_outline,
-            color: Color(0xFF84BD00),
-            size: 56,
-          ),
-        ),
+      errorBuilder: (context, error, stackTrace) => Icon(
+        Icons.circle,
+        color: const Color(0xFF84BD00),
+        size: size,
       ),
     );
   }
