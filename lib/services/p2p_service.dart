@@ -293,14 +293,6 @@ class P2PService {
     } catch (e) { return false; }
   }
 
-  static Future<bool> submitFeedback(String orderId, int rating, String feedback) async {
-    try {
-      final response = await http.post(Uri.parse('$_baseUrl/p2p/v1/p2p/order/feedback'), headers: await _getHeaders(), 
-        body: json.encode({'orderId': orderId, 'rating': rating, 'comment': feedback}));
-      return response.statusCode == 200;
-    } catch (e) { return false; }
-  }
-
   static Future<bool> cancelOrder(String orderId, String reason) async {
     try {
       final response = await http.post(Uri.parse('$_baseUrl/p2p/v1/p2p/order/cancel'), headers: await _getHeaders(), 
@@ -515,6 +507,32 @@ class P2PService {
     } catch (e) { return false; }
   }
 
+  static Future<Map<String, dynamic>> checkPaymentMethodEligibility() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/p2p/v1/payment/eligibility'), 
+        headers: await _getHeaders()
+      );
+      debugPrint('Payment eligibility response status: ${response.statusCode}');
+      debugPrint('Payment eligibility response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        return {
+          'eligible': false,
+          'message': 'Unable to verify eligibility at this time',
+        };
+      }
+    } catch (e) { 
+      debugPrint('Payment eligibility error: $e');
+      return {
+        'eligible': false,
+        'message': 'Error checking eligibility: $e',
+      };
+    }
+  }
+
   static Future<bool> savePaymentMethod(Map<String, dynamic> paymentData) async {
     try {
       final response = await http.post(
@@ -565,5 +583,75 @@ class P2PService {
       }
     } catch (e) { debugPrint('Payment methods error: $e'); }
     return [];
+  }
+
+  // --- Feedback Methods ---
+  static Future<List<dynamic>> getReceivedFeedback() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/p2p/v1/feedback/received'), 
+        headers: await _getHeaders()
+      );
+      debugPrint('Received feedback response status: ${response.statusCode}');
+      debugPrint('Received feedback response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List<dynamic> feedback = [];
+        if (data is List) {
+          feedback = data;
+        } else if (data is Map) {
+          feedback = data['data'] ?? data['result'] ?? data['feedback'] ?? [];
+        }
+        debugPrint('Received feedback count: ${feedback.length}');
+        return feedback;
+      } else if (response.statusCode == 401) {
+        debugPrint('Authentication failed for feedback - token might be expired');
+        throw Exception('Authentication failed. Please login again.');
+      }
+    } catch (e) { 
+      debugPrint('Received feedback error: $e');
+      throw Exception('Failed to load feedback: $e');
+    }
+    return [];
+  }
+
+  static Future<List<dynamic>> getGivenFeedback() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/p2p/v1/feedback/given'), 
+        headers: await _getHeaders()
+      );
+      debugPrint('Given feedback response status: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List<dynamic> feedback = [];
+        if (data is List) {
+          feedback = data;
+        } else if (data is Map) {
+          feedback = data['data'] ?? data['result'] ?? data['feedback'] ?? [];
+        }
+        return feedback;
+      }
+    } catch (e) { 
+      debugPrint('Given feedback error: $e');
+    }
+    return [];
+  }
+
+  static Future<bool> submitFeedback(Map<String, dynamic> feedbackData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/p2p/v1/feedback/submit'), 
+        headers: await _getHeaders(), 
+        body: json.encode(feedbackData)
+      );
+      debugPrint('Submit feedback response status: ${response.statusCode}');
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) { 
+      debugPrint('Submit feedback error: $e');
+      return false;
+    }
   }
 }
