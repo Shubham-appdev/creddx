@@ -137,10 +137,13 @@ class P2PService {
         debugPrint('Advertisement endpoint not found, trying order creation as fallback...');
         
         final orderData = {
-          "adId": "temp-ad-id", // Temporary ad ID
+          "coin": adData["coin"] ?? "USDT",
           "amount": adData["amount"] ?? 0.0,
+          "price": adData["price"] ?? 0.0,
           "paymentMode": adData["paymentMode"]?.first ?? "Bank",
           "type": adData["type"] ?? "buy",
+          "direction": (adData["type"] ?? "buy") == "buy" ? 1 : 0, // Convert to number: 1 for buy, 0 for sell
+          "paymentTime": adData["paymentTime"] ?? 15,
         };
         
         response = await http.post(
@@ -178,7 +181,7 @@ class P2PService {
 
   static Future<bool> publishAdvertisement(String adId) async {
     try {
-      final response = await http.post(Uri.parse('$_baseUrl/p2p/v1/advertise/publish/$adId'), headers: await _getHeaders());
+      final response = await http.post(Uri.parse('$_baseUrl/p2p/v1/p2p/advertise/publish/$adId'), headers: await _getHeaders());
       debugPrint('Publish ad response status: ${response.statusCode}');
       debugPrint('Publish ad response body: ${response.body}');
       return response.statusCode == 200 || response.statusCode == 201;
@@ -484,6 +487,14 @@ class P2PService {
     } catch (e) { return false; }
   }
 
+  static Future<Map<String, dynamic>?> getTradeStatistics() async {
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl/p2p/v1/user/trade-statistics'), headers: await _getHeaders());
+      if (response.statusCode == 200) return json.decode(response.body);
+    } catch (e) { debugPrint('Trade statistics error: $e'); }
+    return null;
+  }
+
   // --- Rating & Feedback ---
   static Future<List<dynamic>> getUserRatings(String userId) async {
     try {
@@ -502,6 +513,38 @@ class P2PService {
         body: json.encode(reportData));
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) { return false; }
+  }
+
+  static Future<bool> savePaymentMethod(Map<String, dynamic> paymentData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/p2p/v1/payment/method/save'), 
+        headers: await _getHeaders(), 
+        body: json.encode(paymentData)
+      );
+      debugPrint('Save payment method response status: ${response.statusCode}');
+      debugPrint('Save payment method response body: ${response.body}');
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) { 
+      debugPrint('Save payment method error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> verifyPaymentMethod(String paymentType) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/p2p/v1/payment/method/verify'), 
+        headers: await _getHeaders(), 
+        body: json.encode({'type': paymentType})
+      );
+      debugPrint('Verify payment method response status: ${response.statusCode}');
+      debugPrint('Verify payment method response body: ${response.body}');
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) { 
+      debugPrint('Verify payment method error: $e');
+      return false;
+    }
   }
 
   // --- Market Data ---
