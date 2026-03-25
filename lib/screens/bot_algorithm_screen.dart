@@ -136,7 +136,7 @@ class _BotAlgorithmScreenState extends State<BotAlgorithmScreen> {
                             'Welcome back, ${userData!['name'] ?? 'User'}!',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 18,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -262,7 +262,7 @@ class _BotAlgorithmScreenState extends State<BotAlgorithmScreen> {
                   strategy['name'],
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 26,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -609,7 +609,7 @@ class _StrategyPerformancePopupState extends State<StrategyPerformancePopup> {
                   widget.strategy['name'],
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
