@@ -554,7 +554,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 'User Security & Management Environment',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
