@@ -610,35 +610,65 @@ class WalletService {
     }
   }
 
-  static Future<Map<String, dynamic>?> getDepositAddress({
-    required String coin,
-    required String network,
-  }) async {
+  // Fetch networks from sub-admin API
+  static Future<List<Map<String, dynamic>>> getSubAdminNetworks() async {
     try {
-      debugPrint('Getting deposit address for coin: $coin, network: $network');
-      final response = await http.post(
-        Uri.parse('$baseUrl/wallet/v1/wallet/deposit/get-erc20-bep20-address'),
+      debugPrint('Fetching sub-admin networks from: $baseUrl/sub-admin/v1/network/all');
+      final response = await http.get(
+        Uri.parse('$baseUrl/sub-admin/v1/network/all'),
         headers: await _getHeaders(),
-        body: json.encode({'coin': coin, 'network': network}),
       );
-      debugPrint('Deposit Address API Response: ${response.body}');
+      debugPrint('Sub-admin Networks API Response Status: ${response.statusCode}');
+      debugPrint('Sub-admin Networks API Response Body: ${response.body}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true) {
-          debugPrint('Deposit address retrieved successfully');
-          return data['data'];
-        } else {
-          debugPrint('Deposit address API returned success: false');
-          return null;
+        debugPrint('Parsed sub-admin networks data: $data');
+        
+        // Handle different response formats
+        if (data is List) return List<Map<String, dynamic>>.from(data);
+        if (data is Map) {
+          var list = data['docs'] ?? data['data'] ?? data['networks'] ?? data['result'] ?? [];
+          if (list is List) {
+            debugPrint('Found networks list with ${list.length} items');
+            return List<Map<String, dynamic>>.from(list);
+          }
         }
+      }
+      debugPrint('No networks data found in API response');
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching sub-admin networks: $e');
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>> getDepositAddress({
+    required String coin,
+    required String coinId,
+    required String networkId,
+  }) async {
+    try {
+      debugPrint('Getting deposit address for coin: $coin, coinId: $coinId, networkId: $networkId');
+      final response = await http.post(
+        Uri.parse('$baseUrl/wallet/v1/wallet/deposit/get-erc20-bep20-address'),
+        headers: await _getHeaders(),
+        body: json.encode({'coin': coin, 'coinId': coinId, 'networkId': networkId}),
+      );
+      debugPrint('Deposit Address API Response: ${response.body}');
+      
+      final data = json.decode(response.body);
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        debugPrint('Deposit address retrieved successfully');
+        return {'success': true, 'data': data['data'] ?? data['doc']};
       } else {
-        debugPrint('Deposit address API failed with status: ${response.statusCode}');
-        return null;
+        debugPrint('Deposit address API failed: ${data['message']}');
+        return {'success': false, 'error': data['message'] ?? 'Failed to fetch deposit address'};
       }
     } catch (e) {
       debugPrint('Error getting deposit address: $e');
-      return null;
+      return {'success': false, 'error': 'Network error: $e'};
     }
   }
 

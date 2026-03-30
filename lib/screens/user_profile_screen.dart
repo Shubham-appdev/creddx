@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'update_profile_screen.dart';
 import 'referral_hub_screen.dart';
 import 'kyc_document_screen.dart';
+import 'withdraw_screen.dart';
+import 'deposit_screen.dart';
 import '../services/user_service.dart';
 import '../services/p2p_service.dart';
+import '../services/auth_service.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -15,16 +23,229 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isAssetsAllocationExpanded = false;
+  bool _isWalletViewSelected = true;
+  bool _isWalletHidden = true;
   final UserService _userService = UserService();
   List<dynamic> _trustedDevices = [];
   bool _isLoadingDevices = true;
+  
+  // WebSocket for wallet balance
+  WebSocketChannel? _walletWsChannel;
+  Map<String, dynamic> _walletBalances = {};
+  bool _isLoadingWallet = true;
+  String? _walletError;
+  Timer? _loadingTimeout;
+  
+  // Asset prices
+  Map<String, double> _assetPrices = {'ETH': 2450.00, 'USDT': 1.00, 'USDC': 1.00};
+  
+  static const String _wsBaseUrl = 'ws://13.235.89.109:9001';
+  static const String _httpBaseUrl = 'http://13.235.89.109:9000';
 
   @override
   void initState() {
     super.initState();
-    // Initialize user data if not already done
     _loadUserData();
     _loadTrustedDevices();
+    _connectWalletWebSocket();
+  }
+  
+  @override
+  void dispose() {
+    _walletWsChannel?.sink.close();
+    _loadingTimeout?.cancel();
+    super.dispose();
+  }
+  
+  // Fallback: Fetch balance via REST API
+  Future<void> _fetchBalanceViaHttp() async {
+    try {
+      final token = await AuthService.getToken();
+      final userId = await _getUserId();
+      
+      final response = await http.get(
+        Uri.parse('$_httpBaseUrl/balance/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+      
+      debugPrint('HTTP Balance Response: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          setState(() {
+            _walletBalances = data['data'];
+            _isLoadingWallet = false;
+          });
+          return;
+        }
+      }
+      
+      // If HTTP fails, show 0 balances
+      setState(() {
+        _walletBalances = {};
+        _isLoadingWallet = false;
+      });
+    } catch (e) {
+      debugPrint('HTTP balance fetch error: $e');
+      setState(() {
+        _walletBalances = {};
+        _isLoadingWallet = false;
+      });
+    }
+  }
+  
+  Future<String> _getUserId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? userId = prefs.getString('user_id');
+      if (userId != null) return userId;
+      int? userIdInt = prefs.getInt('user_id');
+      if (userIdInt != null) return userIdInt.toString();
+      return '1';
+    } catch (e) {
+      return '1';
+    }
+  }
+  
+  void _connectWalletWebSocket() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        setState(() {
+          _walletError = 'Authentication required';
+          _isLoadingWallet = false;
+        });
+        return;
+      }
+      
+      // Add timeout to stop loading if WebSocket doesn't respond
+      _loadingTimeout = Timer(const Duration(seconds: 5), () {
+        if (mounted && _isLoadingWallet) {
+          debugPrint('WebSocket timeout, trying HTTP fallback...');
+          _fetchBalanceViaHttp();
+        }
+      });
+      
+      _walletWsChannel = WebSocketChannel.connect(
+        Uri.parse('ws://13.235.89.109:9001/ws'),
+        protocols: ['websocket'],
+      );
+      
+      _walletWsChannel!.stream.listen(
+        _handleWalletWebSocketMessage,
+        onError: (error) {
+          debugPrint('Wallet WebSocket error: $error');
+          if (mounted) {
+            setState(() {
+              _isLoadingWallet = false;
+              _walletBalances = {};
+            });
+          }
+        },
+        onDone: () {
+          debugPrint('Wallet WebSocket disconnected, reconnecting...');
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted) _connectWalletWebSocket();
+          });
+        },
+      );
+      
+      // Authenticate and subscribe to balance updates
+      _sendWalletWsMessage({
+        'type': 'auth',
+        'token': token,
+      });
+      
+      _sendWalletWsMessage({
+        'type': 'subscribe',
+        'channel': 'balance',
+      });
+    } catch (e) {
+      debugPrint('Wallet WebSocket connection error: $e');
+      setState(() {
+        _walletError = null;
+        _isLoadingWallet = false;
+        _walletBalances = {};
+      });
+    }
+  }
+  
+  void _handleWalletWebSocketMessage(dynamic message) {
+    try {
+      final data = json.decode(message);
+      debugPrint('Wallet WebSocket message: $data');
+      
+      // Handle various response formats - only cancel timeout when we get actual data
+      if (data['type'] == 'balance_update' || 
+          data['channel'] == 'balance' || 
+          data['balances'] != null ||
+          data['spot'] != null ||
+          data['main'] != null ||
+          data['p2p'] != null ||
+          data['bot'] != null ||
+          data['data'] != null) {
+        // Cancel timeout only when we get actual balance data
+        _loadingTimeout?.cancel();
+        setState(() {
+          _walletBalances = data['data'] ?? data;
+          _isLoadingWallet = false;
+        });
+      } else if (data['type'] == 'auth_ok' || data['success'] == true) {
+        debugPrint('WebSocket authenticated, requesting balances...');
+        _sendWalletWsMessage({'type': 'get_balances'});
+      }
+    } catch (e) {
+      debugPrint('Error parsing WebSocket message: $e');
+    }
+  }
+  
+  void _sendWalletWsMessage(Map<String, dynamic> message) {
+    if (_walletWsChannel != null) {
+      _walletWsChannel!.sink.add(json.encode(message));
+    }
+  }
+  
+  String _getAssetBalance(String asset) {
+    if (_isLoadingWallet) return '...';
+    
+    final balance = _walletBalances[asset.toLowerCase()] ?? 
+                   _walletBalances[asset] ?? 
+                   _walletBalances['${asset.toLowerCase()}_available'] ??
+                   _walletBalances['${asset}_available'];
+    
+    if (balance != null) {
+      final amount = double.tryParse(balance.toString()) ?? 0.0;
+      if (amount > 0) return '$amount $asset';
+    }
+    
+    // Check nested data structure
+    final nestedData = _walletBalances['data'];
+    if (nestedData is Map) {
+      final nestedBalance = nestedData[asset.toLowerCase()] ?? nestedData[asset];
+      if (nestedBalance != null) {
+        final amount = double.tryParse(nestedBalance.toString()) ?? 0.0;
+        if (amount > 0) return '$amount $asset';
+      }
+    }
+    
+    return '0.00 $asset';
+  }
+  
+  String _getAssetPrice(String asset) {
+    final price = _assetPrices[asset] ?? 0.0;
+    return '\$${price.toStringAsFixed(2)}';
+  }
+  
+  double _getAssetValue(String asset) {
+    final balanceStr = _getAssetBalance(asset).replaceAll(' $asset', '').replaceAll(asset, '').trim();
+    final balance = double.tryParse(balanceStr) ?? 0.0;
+    final price = _assetPrices[asset] ?? 0.0;
+    return balance * price;
   }
 
   Future<void> _loadUserData() async {
@@ -313,37 +534,266 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Widget _buildAssetsAllocationContent() {
+    final walletTypes = ['Main', 'SPOT', 'P2P', 'Bot'];
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              _buildToggleButton('Wallet View', true),
+              GestureDetector(
+                onTap: () => setState(() => _isWalletViewSelected = true),
+                child: _buildToggleButton('Wallet View', _isWalletViewSelected),
+              ),
               const SizedBox(width: 8),
-              _buildToggleButton('Coin View', false),
-              const Spacer(),
-              const Icon(Icons.search, color: Colors.white54, size: 20),
+              GestureDetector(
+                onTap: () => setState(() => _isWalletViewSelected = false),
+                child: _buildToggleButton('Coin View', !_isWalletViewSelected),
+              ),
             ],
           ),
           const SizedBox(height: 24),
-          _buildAssetRow('ETH', 'Wallet Balance', '***', '***'),
-          const SizedBox(height: 20),
-          _buildAssetRow('USDT', 'Wallet Balance', '***', '***'),
-          const SizedBox(height: 20),
-          _buildAssetRow('USDC', 'Wallet Balance', '***', '***'),
-          const SizedBox(height: 24),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () {},
-              icon: const Text('Next', style: TextStyle(color: Colors.white70)),
-              label: const Icon(Icons.arrow_forward, color: Colors.white70, size: 16),
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.white10,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          // Headers
+          Row(
+            children: [
+              const Expanded(
+                flex: 2,
+                child: Text('Account', style: TextStyle(color: Colors.white54, fontSize: 11)),
               ),
+              const SizedBox(
+                width: 80,
+                child: Text('Total Price', style: TextStyle(color: Colors.white54, fontSize: 11)),
+              ),
+              const SizedBox(width: 4),
+              const SizedBox(
+                width: 50,
+                child: Text('Actions', style: TextStyle(color: Colors.white54, fontSize: 11), textAlign: TextAlign.right),
+              ),
+            ],
+          ),
+          const Divider(color: Colors.white10, height: 24),
+          if (_isLoadingWallet)
+            const Center(
+              child: SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(color: Color(0xFF84BD00), strokeWidth: 2),
+              ),
+            )
+          else ...[
+            ...(_isWalletViewSelected 
+              ? ['Main', 'SPOT', 'P2P', 'Bot']
+              : ['INR', 'USDT']
+            ).asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              final balance = _isWalletViewSelected 
+                ? _getWalletBalance(item)
+                : _getCoinBalance(item);
+              final isLast = index == (_isWalletViewSelected ? 4 : 2) - 1;
+              
+              return Column(
+                children: [
+                  _buildWalletRow(item, balance),
+                  if (!isLast) const Divider(color: Colors.white10, height: 16),
+                ],
+              );
+            }).toList(),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  String _getWalletBalance(String walletType) {
+    if (_isLoadingWallet) return '...';
+    
+    // Map wallet type to API response keys
+    final typeKey = walletType.toLowerCase();
+    final data = _walletBalances;
+    
+    double total = 0.0;
+    
+    // Check different possible data structures
+    if (data[typeKey] != null) {
+      final wallet = data[typeKey];
+      if (wallet is Map) {
+        // Try to get USDT balance from this wallet
+        final balances = wallet['balances'];
+        if (balances is List) {
+          for (final bal in balances) {
+            if (bal is Map && (bal['coin']?.toString().toUpperCase() == 'USDT' || bal['asset']?.toString().toUpperCase() == 'USDT')) {
+              final available = double.tryParse(bal['available']?.toString() ?? '0') ?? 0.0;
+              final locked = double.tryParse(bal['locked']?.toString() ?? '0') ?? 0.0;
+              total = available + locked;
+              break;
+            }
+          }
+        } else if (wallet['usdt_total'] != null) {
+          total = double.tryParse(wallet['usdt_total'].toString()) ?? 0.0;
+        } else if (wallet['total'] != null) {
+          total = double.tryParse(wallet['total'].toString()) ?? 0.0;
+        }
+      } else if (wallet is num) {
+        total = wallet.toDouble();
+      }
+    }
+    
+    // Also check nested data structure
+    if (total == 0.0 && data['data'] != null) {
+      final nestedData = data['data'];
+      if (nestedData is Map && nestedData[typeKey] != null) {
+        final wallet = nestedData[typeKey];
+        if (wallet is Map) {
+          if (wallet['balances'] is List) {
+            for (final bal in wallet['balances']) {
+              if (bal is Map && (bal['coin']?.toString().toUpperCase() == 'USDT' || bal['asset']?.toString().toUpperCase() == 'USDT')) {
+                final available = double.tryParse(bal['available']?.toString() ?? '0') ?? 0.0;
+                final locked = double.tryParse(bal['locked']?.toString() ?? '0') ?? 0.0;
+                total = available + locked;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    if (_isWalletHidden) return '*** USDT';
+    return '${total.toStringAsFixed(6)} USDT';
+  }
+  
+  String _getCoinBalance(String coin) {
+    if (_isLoadingWallet) return '...';
+    
+    final coinKey = coin.toLowerCase();
+    final data = _walletBalances;
+    double total = 0.0;
+    
+    // Sum balance from all wallets for this coin
+    final walletTypes = ['main', 'spot', 'p2p', 'bot'];
+    
+    for (String walletType in walletTypes) {
+      if (data[walletType] != null) {
+        final wallet = data[walletType];
+        if (wallet is Map) {
+          final balances = wallet['balances'];
+          if (balances is List) {
+            for (final bal in balances) {
+              if (bal is Map && bal['coin']?.toString().toUpperCase() == coin) {
+                final available = double.tryParse(bal['available']?.toString() ?? '0') ?? 0.0;
+                final locked = double.tryParse(bal['locked']?.toString() ?? '0') ?? 0.0;
+                total += available + locked;
+                break;
+              }
+            }
+          } else if (wallet['${coinKey}_total'] != null) {
+            total += double.tryParse(wallet['${coinKey}_total'].toString()) ?? 0.0;
+          } else if (wallet[coinKey] != null) {
+            total += double.tryParse(wallet[coinKey].toString()) ?? 0.0;
+          }
+        }
+      }
+    }
+    
+    // Check nested data structure
+    if (total == 0.0 && data['data'] != null) {
+      final nestedData = data['data'];
+      if (nestedData is Map) {
+        for (String walletType in walletTypes) {
+          if (nestedData[walletType] != null) {
+            final wallet = nestedData[walletType];
+            if (wallet is Map && wallet['balances'] is List) {
+              for (final bal in wallet['balances']) {
+                if (bal is Map && bal['coin']?.toString().toUpperCase() == coin) {
+                  final available = double.tryParse(bal['available']?.toString() ?? '0') ?? 0.0;
+                  final locked = double.tryParse(bal['locked']?.toString() ?? '0') ?? 0.0;
+                  total += available + locked;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Also check direct coin keys in data
+    if (total == 0.0 && data[coinKey] != null) {
+      total = double.tryParse(data[coinKey].toString()) ?? 0.0;
+    }
+    if (total == 0.0 && data['${coinKey}_total'] != null) {
+      total = double.tryParse(data['${coinKey}_total'].toString()) ?? 0.0;
+    }
+    
+    if (_isWalletHidden) return '*** $coin';
+    return '${total.toStringAsFixed(6)} $coin';
+  }
+  
+  Widget _buildWalletRow(String walletType, String balance) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text('$walletType Holding', 
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+            ),
+          ),
+          SizedBox(
+            width: 80,
+            child: Text(balance, 
+              style: const TextStyle(color: Colors.white, fontSize: 10),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 50,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const DepositScreen()));
+                  },
+                  child: Container(
+                    width: 50,
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Deposit',
+                      style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const WithdrawScreen()));
+                  },
+                  child: Container(
+                    width: 50,
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF84BD00),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Withdraw',
+                      style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -353,15 +803,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Widget _buildToggleButton(String text, bool isSelected) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isSelected ? Colors.black : Colors.transparent,
+        color: isSelected ? const Color(0xFF84BD00) : const Color(0xFF2C2C2E),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: isSelected ? Colors.white10 : Colors.transparent),
       ),
       child: Text(
         text,
-        style: TextStyle(color: isSelected ? Colors.white : Colors.white38, fontSize: 12, fontWeight: FontWeight.bold),
+        style: TextStyle(color: isSelected ? Colors.black : Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -391,9 +840,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ),
         Column(
           children: [
-            _buildAssetActionButton('Withdraw', const Color(0xFF84BD00)),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const WithdrawScreen()));
+              },
+              child: _buildAssetActionButton('Withdraw', const Color(0xFF84BD00)),
+            ),
             const SizedBox(height: 8),
-            _buildAssetActionButton('Deposit', Colors.white10),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const DepositScreen()));
+              },
+              child: _buildAssetActionButton('Deposit', Colors.white10),
+            ),
           ],
         ),
       ],

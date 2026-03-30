@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/wallet_service.dart';
 
 class DepositAddressScreen extends StatefulWidget {
   final String coin;
+  final String coinId;
   final String network;
+  final String networkId;
 
   const DepositAddressScreen({
     super.key,
     required this.coin,
+    required this.coinId,
     required this.network,
+    required this.networkId,
   });
 
   @override
@@ -30,15 +35,22 @@ class _DepositAddressScreenState extends State<DepositAddressScreen> {
   Future<void> _fetchDepositAddress() async {
     final result = await WalletService.getDepositAddress(
       coin: widget.coin,
-      network: widget.network,
+      coinId: widget.coinId,
+      networkId: widget.networkId,
     );
     
     if (mounted) {
       setState(() {
-        if (result != null) {
-          _address = result['address'] ?? result['depositAddress'];
+        if (result['success'] == true) {
+          final data = result['data'] ?? result['doc'];
+          if (data != null) {
+            _address = data['address'] ?? data['depositAddress'] ?? data['walletAddress'];
+          }
+          if (_address == null || _address!.isEmpty) {
+            _errorMessage = 'No deposit address returned from server';
+          }
         } else {
-          _errorMessage = 'Failed to fetch deposit address';
+          _errorMessage = result['error'] ?? 'Failed to fetch deposit address';
         }
         _isLoading = false;
       });
@@ -195,9 +207,12 @@ class _DepositAddressScreenState extends State<DepositAddressScreen> {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // Share logic
-                        },
+                        onPressed: _address != null ? () {
+                          Share.share(
+                            'Deposit ${widget.coin} on ${widget.network} network:\n$_address',
+                            subject: '${widget.coin} Deposit Address',
+                          );
+                        } : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF84BD00),
                           shape: RoundedRectangleBorder(

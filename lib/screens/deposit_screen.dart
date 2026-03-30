@@ -25,26 +25,48 @@ class _DepositScreenState extends State<DepositScreen> {
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
     try {
+      print('=== Fetching deposit data ===');
       // Fetch coins with their networks from API
       final List<Map<String, dynamic>> coinsData = await WalletService.getAllCoins();
+      print('Coins data count: ${coinsData.length}');
       
       if (mounted) {
         setState(() {
-          _coins = coinsData.map((data) => Coin.fromJson(data)).toList();
+          // Parse all coins first
+          final allCoins = coinsData.map((data) => Coin.fromJson(data)).toList();
+          print('All coins parsed: ${allCoins.length}');
           
+          // Filter only USDT coins
+          _coins = allCoins.where((coin) => coin.symbol.toUpperCase() == 'USDT').toList();
+          print('Filtered USDT coins: ${_coins.length}');
+          
+          // Get networks from the first USDT coin (which has networks embedded)
           if (_coins.isNotEmpty) {
-            _selectedCoinId = _coins.first.id;
-            _updateNetworksForCoin(_coins.first);
+            final usdtCoin = _coins.first;
+            _selectedCoinId = usdtCoin.id;
+            
+            // Extract networks from the coin's networks field
+            _networks = usdtCoin.networks.where((n) => n.isActive).toList();
+            print('Networks from USDT coin: ${_networks.length}');
+            for (var net in _networks) {
+              print('Network: ${net.name} (${net.id})');
+            }
+            
+            if (_networks.isNotEmpty) {
+              _selectedNetworkId = _networks.first.id;
+            }
           }
           
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Error fetching data: $e');
+      print('Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
           _coins = [];
+          _networks = [];
           _isLoading = false;
         });
       }
@@ -53,16 +75,13 @@ class _DepositScreenState extends State<DepositScreen> {
 
   
   void _updateNetworksForCoin(Coin coin) {
-    setState(() {
-      // Use only active networks from the selected coin
-      _networks = coin.networks.where((network) => network.isActive).toList();
-      
-      if (_networks.isNotEmpty) {
+    // Networks are now fetched separately from sub-admin API
+    // This method can be used for any coin-specific network filtering if needed
+    if (_networks.isNotEmpty) {
+      setState(() {
         _selectedNetworkId = _networks.first.id;
-      } else {
-        _selectedNetworkId = null;
-      }
-    });
+      });
+    }
   }
 
   @override
@@ -133,7 +152,6 @@ class _DepositScreenState extends State<DepositScreen> {
                       if (value != null) {
                         setState(() {
                           _selectedCoinId = value;
-                          _updateNetworksForCoin(_coins.firstWhere((c) => c.id == value));
                         });
                       }
                     },
@@ -223,7 +241,12 @@ class _DepositScreenState extends State<DepositScreen> {
       child: ElevatedButton(
         onPressed: (coin != null && networkId != null) ? () {
           final network = _networks.firstWhere((n) => n.id == networkId);
-          Navigator.of(context).push(MaterialPageRoute(builder: (context) => DepositAddressScreen(coin: coin.symbol, network: network.name)));
+          Navigator.of(context).push(MaterialPageRoute(builder: (context) => DepositAddressScreen(
+            coin: coin.symbol, 
+            coinId: coin.id,
+            network: network.name,
+            networkId: network.id,
+          )));
         } : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF84BD00),

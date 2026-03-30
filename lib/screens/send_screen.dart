@@ -34,7 +34,10 @@ class _SendScreenState extends State<SendScreen> {
       if (mounted) {
         setState(() {
           _coins = coins;
-          _cryptoOptions = coins.map((coin) => (coin['symbol'] ?? 'BTC').toString()).toList();
+          _cryptoOptions = coins.map((coin) => (coin['symbol'] ?? 'BTC').toString()).toSet().toList();
+          if (!_cryptoOptions.contains(_selectedCrypto)) {
+            _selectedCrypto = _cryptoOptions.isNotEmpty ? _cryptoOptions.first : 'BTC';
+          }
           _isLoading = false;
         });
       }
