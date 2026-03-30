@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../main_navigation.dart';
 import '../services/auth_service.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
 import 'payment_method_screen.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -204,95 +205,117 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 30),
-              const Text(
-                'Verification Code',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'We have sent the 6-digit verification code to\nyour registered ${widget.email != null ? 'email/phone' : 'email address'}',
-                style: const TextStyle(fontSize: 16, color: Color(0xFF6C7278)),
-              ),
-              if (widget.email != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  widget.email!,
-                  style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-              ],
-              const SizedBox(height: 40),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(6, (index) => _buildOtpBox(index)),
-              ),
-              
-              const SizedBox(height: 32),
-              
-              Center(
-                child: Column(
-                  children: [
-                    const Text(
-                      "Didn't receive the code?",
-                      style: TextStyle(color: Color(0xFF6C7278), fontSize: 14),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 30),
+                  const Text(
+                    'Verification Code',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      height: 1.2,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'We have sent the 6-digit verification code to\nyour registered ${widget.email != null ? 'email/phone' : 'email address'}',
+                    style: const TextStyle(fontSize: 16, color: Color(0xFF6C7278)),
+                  ),
+                  if (widget.email != null) ...[
                     const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: _isResending ? null : _resendOtp,
-                      child: Text(
-                        _isResending ? 'Sending...' : 'Resend Code',
-                        style: TextStyle(
-                          color: _isResending ? Colors.grey : const Color(0xFF84BD00),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                    Text(
+                      widget.email!,
+                      style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                  const SizedBox(height: 40),
+                  
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(6, (index) => _buildOtpBox(index)),
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  Center(
+                    child: Column(
+                      children: [
+                        const Text(
+                          "Didn't receive the code?",
+                          style: TextStyle(color: Color(0xFF6C7278), fontSize: 14),
                         ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: _isResending ? null : _resendOtp,
+                          child: Text(
+                            _isResending ? 'Sending...' : 'Resend Code',
+                            style: TextStyle(
+                              color: _isResending ? Colors.grey : const Color(0xFF84BD00),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _verifyOtp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isLoading ? Colors.grey : const Color(0xFF84BD00),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: OtpLoadingIndicator(size: 24, color: Colors.white),
+                              )
+                            : const Text('Verify', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.7),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OtpLoadingIndicator(size: 60, color: Color(0xFF84BD00)),
+                    SizedBox(height: 24),
+                    Text(
+                      'Verifying...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              
-              const SizedBox(height: 40),
-              
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _verifyOtp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isLoading ? Colors.grey : const Color(0xFF84BD00),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text('Verify', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }

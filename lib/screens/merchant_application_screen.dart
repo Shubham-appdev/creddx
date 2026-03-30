@@ -359,12 +359,50 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> w
     {'name': 'Zimbabwe', 'code': '+263'},
   ];
 
+  // API fetched data for My Adverts
+  List<dynamic> _myAdverts = [];
+  bool _isMyAdvertsLoading = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _fetchCoinsAndFiat();
     _fetchPaymentModes();
+    _fetchMyAdverts();
+
+    // Listen to tab changes to refresh my adverts when tab is selected
+    _tabController.addListener(() {
+      if (_tabController.index == 0) {
+        _fetchMyAdverts();
+      }
+    });
+  }
+
+  Future<void> _fetchMyAdverts() async {
+    setState(() => _isMyAdvertsLoading = true);
+    try {
+      final adverts = await P2PService.getMyAdvertisements();
+      if (mounted) {
+        setState(() {
+          _myAdverts = adverts;
+          _isMyAdvertsLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching my adverts: $e');
+      if (mounted) {
+        setState(() => _isMyAdvertsLoading = false);
+      }
+    }
+  }
+
+  List<dynamic> get _filteredAdverts {
+    final type = _isBuySelected ? 'buy' : 'sell';
+    return _myAdverts.where((ad) {
+      final adType = ad['type']?.toString().toLowerCase() ?? '';
+      return adType == type;
+    }).toList();
   }
 
   Future<void> _fetchCoinsAndFiat() async {
@@ -712,6 +750,8 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> w
   }
 
   Widget _buildMyAdvertsTab() {
+    final filteredAdverts = _filteredAdverts;
+
     return Column(
       children: [
         Padding(
@@ -727,58 +767,73 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> w
                   ),
                   child: Row(
                     children: [
-                      _buildToggleItem('Buy', _isBuySelected, () => setState(() => _isBuySelected = true)),
-                      _buildToggleItem('Sell', !_isBuySelected, () => setState(() => _isBuySelected = false)),
+                      _buildToggleItem('Buy', _isBuySelected, () {
+                        setState(() {
+                          _isBuySelected = true;
+                        });
+                      }),
+                      _buildToggleItem('Sell', !_isBuySelected, () {
+                        setState(() {
+                          _isBuySelected = false;
+                        });
+                      }),
                     ],
                   ),
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1C1C1E),
-                  borderRadius: BorderRadius.circular(8),
+              GestureDetector(
+                onTap: _fetchMyAdverts,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C1C1E),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: _isMyAdvertsLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Color(0xFF84BD00), strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh, color: Colors.white, size: 20),
                 ),
-                child: const Icon(Icons.tune, color: Colors.white, size: 20),
               ),
             ],
           ),
         ),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              _buildAdvertCard(
-                date: '21 March 2025',
-                posted: '2 Days ago',
-                status: 'Live',
-                amount: '500.00 USDT',
-                currency: 'INR',
-                limit: '₹20,000.00 - ₹1,00,000.00',
-                tradeQty: '500.00 USDT',
-                payments: [
-                  {'name': 'UPI Payment', 'color': Colors.purple},
-                  {'name': 'Bank Transfer (India)', 'color': Colors.orange},
-                ],
-                isLive: true,
-              ),
-              _buildAdvertCard(
-                date: '21 March 2025',
-                posted: '2 Days ago',
-                status: 'Completed',
-                amount: '500.00 USDT',
-                currency: 'INR',
-                limit: '2,00.00 - 1,000.00 USDT',
-                tradeQty: '50,000.00 USDT',
-                payments: [
-                  {'name': 'UPI Payment', 'color': Colors.purple},
-                  {'name': 'Bank Transfer (India)', 'color': Colors.orange},
-                ],
-                isLive: false,
-              ),
-            ],
-          ),
+          child: _isMyAdvertsLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFF84BD00)),
+              )
+            : filteredAdverts.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.inbox, color: Colors.white38, size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        _isBuySelected ? 'No Buy adverts found' : 'No Sell adverts found',
+                        style: const TextStyle(color: Colors.white54, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _fetchMyAdverts,
+                  color: const Color(0xFF84BD00),
+                  backgroundColor: const Color(0xFF1C1C1E),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filteredAdverts.length,
+                    itemBuilder: (context, index) {
+                      final ad = filteredAdverts[index];
+                      return _buildAdvertCardFromData(ad);
+                    },
+                  ),
+                ),
         ),
       ],
     );
@@ -1355,6 +1410,97 @@ class _MerchantApplicationScreenState extends State<MerchantApplicationScreen> w
         ),
       ),
     );
+  }
+
+  Widget _buildAdvertCardFromData(Map<String, dynamic> ad) {
+    // Parse data from API response
+    final date = ad['createdAt'] != null
+      ? _formatDate(ad['createdAt'].toString())
+      : 'N/A';
+    final posted = ad['createdAt'] != null
+      ? _timeAgo(ad['createdAt'].toString())
+      : '';
+
+    final status = ad['status']?.toString() ?? 'active';
+    final isLive = status.toLowerCase() == 'active' || status.toLowerCase() == 'live';
+
+    final coin = ad['coin']?.toString() ?? 'USDT';
+    final amount = ad['amount']?.toString() ?? ad['quantity']?.toString() ?? '0';
+    final fiat = ad['fiat']?.toString() ?? 'INR';
+
+    final min = ad['min']?.toString() ?? '0';
+    final max = ad['max']?.toString() ?? '0';
+    final limit = '$fiat $min - $fiat $max';
+
+    final tradeQty = '$amount $coin';
+
+    // Parse payment modes
+    final paymentModes = ad['paymentMode'] ?? ad['paymentMethods'] ?? [];
+    final payments = <Map<String, dynamic>>[];
+    if (paymentModes is List) {
+      for (var mode in paymentModes) {
+        final name = mode.toString();
+        Color color = Colors.blue;
+        if (name.toLowerCase().contains('upi')) color = Colors.purple;
+        else if (name.toLowerCase().contains('bank')) color = Colors.orange;
+        else if (name.toLowerCase().contains('paytm')) color = Colors.blue;
+        else if (name.toLowerCase().contains('gpay')) color = Colors.green;
+        payments.add({'name': name, 'color': color});
+      }
+    }
+    if (payments.isEmpty) {
+      payments.add({'name': 'Bank Transfer', 'color': Colors.orange});
+    }
+
+    return _buildAdvertCard(
+      date: date,
+      posted: posted,
+      status: isLive ? 'Live' : 'Completed',
+      amount: '$amount $coin',
+      currency: fiat,
+      limit: limit,
+      tradeQty: tradeQty,
+      payments: payments,
+      isLive: isLive,
+    );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.day} ${_getMonthName(date.month)} ${date.year}';
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  String _getMonthName(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[month - 1];
+  }
+
+  String _timeAgo(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+
+      if (diff.inDays > 365) {
+        return '${diff.inDays ~/ 365} year${diff.inDays ~/ 365 > 1 ? 's' : ''} ago';
+      } else if (diff.inDays > 30) {
+        return '${diff.inDays ~/ 30} month${diff.inDays ~/ 30 > 1 ? 's' : ''} ago';
+      } else if (diff.inDays > 0) {
+        return '${diff.inDays} day${diff.inDays > 1 ? 's' : ''} ago';
+      } else if (diff.inHours > 0) {
+        return '${diff.inHours} hour${diff.inHours > 1 ? 's' : ''} ago';
+      } else if (diff.inMinutes > 0) {
+        return '${diff.inMinutes} min${diff.inMinutes > 1 ? 's' : ''} ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (e) {
+      return '';
+    }
   }
 
   Widget _buildAdvertCard({

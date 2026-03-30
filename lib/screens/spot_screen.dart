@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../services/spot_service.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
 import 'chart_screen.dart';
 
 class SpotScreen extends StatefulWidget {
@@ -701,10 +702,7 @@ class _SpotScreenState extends State<SpotScreen> {
               const SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF84BD00)),
-                ),
+                child: BitcoinLoadingIndicator(size: 16),
               ),
           ],
         ),

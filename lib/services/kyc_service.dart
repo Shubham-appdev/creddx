@@ -85,23 +85,21 @@ class KYCService {
         };
       }
 
-      // Create multipart request
+      // Create multipart request with new API endpoint
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('$_baseUrl/kyc/submit'),
+        Uri.parse('http://13.235.89.109:8085/user/v1/kyc/kyc-upload-and-verify'),
       );
 
       // Add headers
       request.headers.addAll({
-        'Content-Type': 'multipart/form-data',
         'Accept': 'application/json',
         'Authorization': 'Bearer ${prefs.getString('auth_token') ?? ''}',
       });
 
       // Add form fields
-      request.fields['user_id'] = userId;
-      request.fields['document_type'] = documentType;
-      request.fields['document_id'] = documentId;
+      request.fields['docId'] = documentId;
+      request.fields['idNumber'] = documentId;
 
       // Add images
       if (frontImage.existsSync()) {
@@ -109,7 +107,7 @@ class KYCService {
         final frontFileName = frontImage.path.split('/').last;
         request.files.add(
           http.MultipartFile.fromBytes(
-            'front_image',
+            'docFrontPic',
             frontImageBytes,
             filename: frontFileName,
           ),
@@ -121,7 +119,7 @@ class KYCService {
         final backFileName = backImage!.path.split('/').last;
         request.files.add(
           http.MultipartFile.fromBytes(
-            'back_image',
+            'docBackPic',
             backImageBytes,
             filename: backFileName,
           ),
@@ -229,13 +227,18 @@ class KYCService {
     required String documentId,
   }) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+
       final response = await http.post(
-        Uri.parse('$_baseUrl/kyc/validate'),
+        Uri.parse('http://13.235.89.109:8085/user/v1/kyc/kyc-validate'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': 'Bearer ${prefs.getString('auth_token') ?? ''}',
         },
         body: json.encode({
+          'user_id': userId,
           'document_type': documentType,
           'document_id': documentId,
         }),
@@ -267,6 +270,96 @@ class KYCService {
       }
     } catch (e) {
       print('Document Validation Error: $e');
+      return {
+        'success': false,
+        'data': null,
+        'error': 'Network error: $e'
+      };
+    }
+  }
+
+  // Verify selfie
+  static Future<Map<String, dynamic>> verifySelfie({
+    required File selfieImage,
+    String? documentType,
+    String? documentId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+      
+      if (userId.isEmpty) {
+        return {
+          'success': false,
+          'error': 'User not logged in',
+          'data': null
+        };
+      }
+
+      // Create multipart request for selfie verification
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://13.235.89.109:8085/user/v1/kyc/kyc-selfie-verify'),
+      );
+
+      // Add headers
+      request.headers.addAll({
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ${prefs.getString('auth_token') ?? ''}',
+      });
+
+      // Add form fields
+      request.fields['user_id'] = userId;
+      if (documentType != null) {
+        request.fields['document_type'] = documentType;
+      }
+      if (documentId != null) {
+        request.fields['document_id'] = documentId;
+      }
+
+      // Add selfie image
+      if (selfieImage.existsSync()) {
+        final selfieImageBytes = await selfieImage.readAsBytes();
+        final selfieFileName = selfieImage.path.split('/').last;
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'selfie_image',
+            selfieImageBytes,
+            filename: selfieFileName,
+          ),
+        );
+      }
+
+      // Send request
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 60));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('Selfie Verify Response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          return {
+            'success': true,
+            'data': responseData['data'],
+            'error': null
+          };
+        } else {
+          return {
+            'success': false,
+            'data': null,
+            'error': responseData['error'] ?? 'Failed to verify selfie'
+          };
+        }
+      } else {
+        return {
+          'success': false,
+          'data': null,
+          'error': 'Server error: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      print('Selfie Verify Error: $e');
       return {
         'success': false,
         'data': null,

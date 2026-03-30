@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/p2p_service.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
 import 'p2p_chat_list_screen.dart';
 import 'p2p_place_order_screen.dart';
 import 'order_history_screen.dart';
@@ -118,7 +119,7 @@ class _P2PTradingScreenState extends State<P2PTradingScreen> {
           if (_showFilters) _buildFiltersSection(),
           Expanded(
             child: _isLoading 
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF84BD00)))
+                ? const Center(child: BitcoinLoadingIndicator(size: 40))
                 : _buildAdsList(),
           ),
         ],
@@ -190,47 +191,37 @@ class _P2PTradingScreenState extends State<P2PTradingScreen> {
     print('DEBUG: Is buy selected: $_isBuySelected');
     print('DEBUG: Selected crypto: $_selectedCrypto');
     
-    // For now, show all ads regardless of filter to ensure display
-    List<dynamic> filteredAds = _offers;
+    // Show all ads without strict filtering - just try to match by coin if possible
+    List<dynamic> filteredAds = [];
     
-    // Only apply filtering if we have ads and they have proper structure
-    if (_offers.isNotEmpty) {
-      final type = _isBuySelected ? 'sell' : 'buy';
-      
+    if (_offers.isEmpty) {
+      print('DEBUG: No offers available');
+    } else {
+      // Show ALL ads first - don't filter by buy/sell type
+      // Just filter by coin if we can determine it
       filteredAds = _offers.where((ad) {
-        // Handle different field names for type
-        String adType = '';
-        if (ad['type'] != null) {
-          adType = ad['type'].toString().toLowerCase();
-        } else if (ad['tradeType'] != null) {
-          adType = ad['tradeType'].toString().toLowerCase();
-        } else if (ad['advertisementType'] != null) {
-          adType = ad['advertisementType'].toString().toLowerCase();
-        }
-        
-        // Handle different field names for coin
+        // Get ad coin
         String adCoin = '';
-        if (ad['coin'] != null) {
-          adCoin = ad['coin'].toString().toUpperCase();
-        } else if (ad['coinSymbol'] != null) {
-          adCoin = ad['coinSymbol'].toString().toUpperCase();
-        } else if (ad['cryptocurrency'] != null) {
-          adCoin = ad['cryptocurrency'].toString().toUpperCase();
-        }
+        if (ad['coin'] != null) adCoin = ad['coin'].toString().toUpperCase();
+        else if (ad['coinSymbol'] != null) adCoin = ad['coinSymbol'].toString().toUpperCase();
+        else if (ad['cryptocurrency'] != null) adCoin = ad['cryptocurrency'].toString().toUpperCase();
+        else if (ad['asset'] != null) adCoin = ad['asset'].toString().toUpperCase();
         
-        print('DEBUG: Ad type: $adType, expected: $type');
-        print('DEBUG: Ad coin: $adCoin, expected: $_selectedCrypto');
+        // If we can't determine coin, show it anyway
+        if (adCoin.isEmpty) return true;
         
-        // If type or coin is missing, include the ad
-        if (adType.isEmpty || adCoin.isEmpty) {
-          return true;
-        }
-        
-        return adType == type && adCoin == _selectedCrypto.toUpperCase();
+        // Only filter by coin, not by type
+        return adCoin == _selectedCrypto.toUpperCase() || adCoin == 'USDT';
       }).toList();
+      
+      print('DEBUG: Total offers: ${_offers.length}, After coin filter: ${filteredAds.length}');
+      
+      // If coin filter removed all, show all
+      if (filteredAds.isEmpty && _offers.isNotEmpty) {
+        print('DEBUG: Coin filter removed all, showing all ${_offers.length} offers');
+        filteredAds = _offers;
+      }
     }
-    
-    print('DEBUG: Filtered ads count: ${filteredAds.length}');
 
     if (filteredAds.isEmpty) {
       String message;

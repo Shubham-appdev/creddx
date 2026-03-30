@@ -307,6 +307,36 @@ class UserService {
     }
   }
 
+  Future<Map<String, dynamic>> verifySelfie({
+    required File selfieImage,
+    String? documentType,
+    String? documentId,
+  }) async {
+    try {
+      final result = await KYCService.verifySelfie(
+        selfieImage: selfieImage,
+        documentType: documentType,
+        documentId: documentId,
+      );
+
+      if (result['success'] == true) {
+        await updateKYCStatus('Pending');
+        return {
+          'success': true,
+          'message': 'Selfie verified successfully',
+          'data': result['data']
+        };
+      } else {
+        return {
+          'success': false,
+          'error': result['error'] ?? 'Failed to verify selfie'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
   Future<Map<String, dynamic>> updateUserProfile({
     String? name,
     String? email,

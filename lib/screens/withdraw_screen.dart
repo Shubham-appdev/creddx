@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'qr_scanner_screen.dart';
 import '../services/wallet_service.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
 
 class WithdrawScreen extends StatefulWidget {
   const WithdrawScreen({super.key});
@@ -230,7 +231,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
         centerTitle: true,
       ),
       body: _isLoading 
-      ? const Center(child: CircularProgressIndicator(color: Color(0xFF84BD00)))
+      ? const Center(child: BitcoinLoadingIndicator(size: 40))
       : SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -374,12 +375,9 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     ),
                     _isFetchingBalance
                         ? const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF84BD00),
-                              strokeWidth: 2,
-                            ),
+                            width: 16,
+                            height: 16,
+                            child: BitcoinLoadingIndicator(size: 16),
                           )
                         : Text(
                             '$_availableBalance $_selectedCoin',
@@ -424,12 +422,9 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                         ),
                         _isFetchingFees
                             ? const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  color: Color(0xFF84BD00),
-                                  strokeWidth: 2,
-                                ),
+                                width: 16,
+                                height: 16,
+                                child: BitcoinLoadingIndicator(size: 16),
                               )
                             : Text(
                                 '$_withdrawalFees $_selectedCoin',

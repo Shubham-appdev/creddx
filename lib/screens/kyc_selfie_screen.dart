@@ -7,11 +7,15 @@ import '../services/user_service.dart';
 class KYCSelfieScreen extends StatefulWidget {
   final File? frontImage;
   final File? backImage;
+  final String? documentType;
+  final String? documentId;
   
   const KYCSelfieScreen({
     super.key,
     this.frontImage,
     this.backImage,
+    this.documentType,
+    this.documentId,
   });
 
   @override
@@ -227,13 +231,11 @@ class _KYCSelfieScreenState extends State<KYCSelfieScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Submit complete KYC with all documents
-      final result = await _userService.submitKYC(
-        documentType: 'Document', // This would be passed from previous screen
-        documentId: 'DocumentID', // This would be passed from previous screen
-        frontImage: widget.frontImage ?? File(''),
-        backImage: widget.backImage,
+      // Verify selfie using separate API
+      final result = await _userService.verifySelfie(
         selfieImage: _selfieImage!,
+        documentType: widget.documentType,
+        documentId: widget.documentId,
       );
 
       if (mounted) {

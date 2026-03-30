@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../main_navigation.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -192,12 +193,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     child: _isLoading
                         ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
+                            width: 24,
+                            height: 24,
+                            child: OtpLoadingIndicator(size: 24, color: Colors.white),
                           )
                         : Text(_otpSent ? 'Complete Signup' : 'Send OTP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   ),

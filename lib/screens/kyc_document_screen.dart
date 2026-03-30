@@ -345,31 +345,8 @@ class _KYCDocumentScreenState extends State<KYCDocumentScreen> {
       return;
     }
 
-    // Validate document with API first
+    // Skip validation API call - proceed directly to submit
     setState(() => _isLoading = true);
-    
-    try {
-      final validationResult = await _userService.validateDocument(
-        documentType: _selectedDocumentType,
-        documentId: _documentIdController.text,
-      );
-
-      if (validationResult['success'] == false) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(validationResult['error'] ?? 'Document validation failed'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-    } catch (e) {
-      // Continue even if validation fails
-      print('Document validation failed: $e');
-    }
 
     // Submit KYC to API
     final result = await _userService.submitKYC(
@@ -386,7 +363,14 @@ class _KYCDocumentScreenState extends State<KYCDocumentScreen> {
       if (result['success'] == true) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => KYCSelfieScreen(frontImage: _frontImage!, backImage: _backImage)),
+          MaterialPageRoute(
+            builder: (context) => KYCSelfieScreen(
+              frontImage: _frontImage!,
+              backImage: _backImage,
+              documentType: _selectedDocumentType,
+              documentId: _documentIdController.text,
+            ),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -13,6 +13,7 @@ import 'deposit_screen.dart';
 import '../services/user_service.dart';
 import '../services/p2p_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -307,9 +308,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Hello ${_userService.userName ?? 'User'}',
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Image.asset(
+                            'assets/images/Hello!.gif',
+                            width: 35,
+                            height: 35,
+                            errorBuilder: (context, error, stackTrace) => const Icon(
+                              Icons.waving_hand, 
+                              color: Color(0xFF84BD00), 
+                              size: 25
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Hello ${_userService.userName ?? 'User'}',
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
                       GestureDetector(
                         onTap: () {
@@ -880,7 +897,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: const Center(
-          child: CircularProgressIndicator(color: Color(0xFF84BD00)),
+          child: BitcoinLoadingIndicator(size: 40),
         ),
       );
     }
@@ -1000,27 +1017,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         children: [
           const SizedBox(height: 16),
           
-          // Section Header
-          Row(
-            children: [
-              Icon(
-                Icons.security_outlined,
-                color: const Color(0xFF84BD00),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'User Security & Management Environment',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 24),
+
           
           // Trusted Devices Subsection
           const Text(
@@ -1190,7 +1187,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
@@ -1201,16 +1198,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             'Current Session IP',
                             style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
                             '192.168.1.1', // This could be dynamic from API
-                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                       decoration: BoxDecoration(
                         color: const Color(0xFF84BD00).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),

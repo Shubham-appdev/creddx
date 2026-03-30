@@ -85,6 +85,100 @@ class WalletService {
     }
   }
 
+  // Calculate total AVAILABLE USDT balance across all wallet types (not total, only available)
+  static Future<double> getTotalAvailableUSDTBalance() async {
+    double availableTotal = 0.0;
+    try {
+      // Try Wallet Service API (8085)
+      final result = await getWalletBalance();
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'];
+        availableTotal = _calculateAvailableSumFromData(data);
+      }
+      
+      // If Wallet Service failed or returned 0, try Spot Service Balance API (9000)
+      if (availableTotal <= 0) {
+        final spotResult = await SpotService.getBalance();
+        if (spotResult['success'] == true && spotResult['data'] != null) {
+          final spotData = spotResult['data'];
+          
+          // Handle 'assets' list format
+          if (spotData['assets'] != null && spotData['assets'] is List) {
+            final List assetsList = spotData['assets'];
+            for (var assetItem in assetsList) {
+              if (assetItem['asset']?.toString().toUpperCase() == 'USDT') {
+                double available = double.tryParse(assetItem['available']?.toString() ?? '0') ?? 0.0;
+                double free = double.tryParse(assetItem['free']?.toString() ?? '0') ?? 0.0;
+                
+                // Use available or free (whichever is greater)
+                availableTotal = available > free ? available : free;
+                break;
+              }
+            }
+          }
+          
+          // If still 0, try direct fields
+          if (availableTotal <= 0) {
+            availableTotal = double.tryParse(spotData['usdt_available']?.toString() ?? '0') ?? 0.0;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error calculating total available USDT balance: $e');
+    }
+    return availableTotal;
+  }
+
+  // Helper to parse and sum AVAILABLE USDT from complex wallet data structures
+  static double _calculateAvailableSumFromData(dynamic data) {
+    double total = 0.0;
+    if (data is Map) {
+      // Check for specific wallet types
+      final walletTypes = ['spot', 'p2p', 'bot', 'demo_bot', 'main'];
+      bool foundInTypes = false;
+      for (String type in walletTypes) {
+        if (data[type] != null && data[type]['balances'] != null) {
+          foundInTypes = true;
+          final balances = data[type]['balances'] as List;
+          for (var b in balances) {
+            if (b['coin']?.toString().toUpperCase() == 'USDT') {
+              // Add only AVAILABLE balance, not total
+              total += double.tryParse(b['available']?.toString() ?? '0') ?? 0.0;
+            }
+          }
+        }
+      }
+      
+      // If not found in categorized types, look for a flat balances list
+      if (!foundInTypes && data['balances'] != null) {
+        final balances = data['balances'] as List;
+        for (var b in balances) {
+          if (b['coin']?.toString().toUpperCase() == 'USDT') {
+            total += double.tryParse(b['available']?.toString() ?? '0') ?? 0.0;
+          }
+        }
+      }
+
+      // Check for common available fields
+      if (total == 0) {
+        total = double.tryParse(data['available_balance']?.toString() ?? 
+                           data['available']?.toString() ?? 
+                           data['free']?.toString() ?? '0.0') ?? 0.0;
+      }
+    } else if (data is List) {
+      for (var wallet in data) {
+        if (wallet['balances'] != null) {
+          for (var b in (wallet['balances'] as List)) {
+            if (b['coin']?.toString().toUpperCase() == 'USDT') {
+              total += double.tryParse(b['available']?.toString() ?? '0') ?? 0.0;
+            }
+          }
+        }
+      }
+    }
+    return total;
+  }
+
   // Calculate total USDT balance across all wallet types using multiple API sources
   static Future<double> getTotalUSDTBalance() async {
     double grandTotal = 0.0;

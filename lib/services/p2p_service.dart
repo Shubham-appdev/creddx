@@ -290,75 +290,45 @@ class P2PService {
     try {
       final headers = await _getHeaders();
       
-      // Try multiple endpoints with different parameters
-      final endpoints = [
-        '$_baseUrl/p2p/v1/p2p/advertise/all',
-        '$_baseUrl/p2p/v1/p2p/advertise/all?limit=100',
-        '$_baseUrl/p2p/v1/p2p/advertise/all?status=active',
-        '$_baseUrl/p2p/v1/advertise/all',
-        '$_baseUrl/advertise/all',
-      ];
+      // Use the specific endpoint as requested
+      final endpoint = '$_baseUrl/p2p/v1/p2p/advertise/all';
+      debugPrint('Fetching from endpoint: $endpoint');
       
-      for (String endpoint in endpoints) {
-        debugPrint('Trying endpoint: $endpoint');
+      final response = await http.get(Uri.parse(endpoint), headers: headers);
+      debugPrint('Response Status: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List<dynamic> ads = [];
         
-        try {
-          final response = await http.get(Uri.parse(endpoint), headers: headers);
-          debugPrint('Response Status: ${response.statusCode}');
+        if (data is List) {
+          ads = data;
+        } else if (data is Map) {
+          ads = data['finalData'] ?? data['data'] ?? data['result'] ?? data['docs'] ?? data['advertisements'] ?? [];
           
-          if (response.statusCode == 200) {
-            final data = json.decode(response.body);
-            List<dynamic> ads = [];
-            
-            if (data is List) {
-              ads = data;
-            } else if (data is Map) {
-              ads = data['finalData'] ?? data['data'] ?? data['result'] ?? data['docs'] ?? data['advertisements'] ?? [];
-              
-              if (ads.isEmpty) {
-                // Check all keys for any lists that might be ads
-                for (var key in (data as Map).keys) {
-                  if (data[key] is List && key.toString().toLowerCase().contains('ad')) {
-                    ads = data[key];
-                    break;
-                  }
-                }
+          if (ads.isEmpty) {
+            // Check all keys for any lists that might be ads
+            for (var key in (data as Map).keys) {
+              if (data[key] is List && key.toString().toLowerCase().contains('ad')) {
+                ads = data[key];
+                break;
               }
             }
-            
-            if (ads.isNotEmpty) {
-              debugPrint('Real advertisements list length from $endpoint: ${ads.length}');
-              return ads;
-            }
           }
-        } catch (e) {
-          debugPrint('Error fetching from $endpoint: $e');
+        }
+        
+        if (ads.isNotEmpty) {
+          debugPrint('Advertisements fetched: ${ads.length}');
+          return ads;
         }
       }
       
-      debugPrint('No ads found in real endpoints, attempting to create test ads...');
-      final testAdsCreated = await createMultipleTestAdvertisements();
-      
-      if (testAdsCreated) {
-        debugPrint('Test ads created, retrying fetch...');
-        await Future.delayed(Duration(seconds: 2));
-        final response = await http.get(Uri.parse('$_baseUrl/p2p/v1/p2p/advertise/all'), headers: headers);
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          List<dynamic> retryAds = [];
-          if (data is Map) {
-            retryAds = data['finalData'] ?? data['data'] ?? data['result'] ?? data['docs'] ?? [];
-          }
-          if (retryAds.isNotEmpty) return retryAds;
-        }
-      }
-      
-      debugPrint('Still no real ads found, using mock as fallback');
-      return _getMockAdvertisements();
+      debugPrint('No ads found, returning empty list');
+      return [];
       
     } catch (e) { 
       debugPrint('Advertisements fetch error: $e');
-      return _getMockAdvertisements();
+      return [];
     }
   }
 

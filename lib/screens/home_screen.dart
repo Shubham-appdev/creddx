@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'dart:math' show pi, cos, sin;
 import 'notification_screen.dart';
 import 'send_screen.dart';
 import 'receive_screen.dart';
@@ -19,6 +20,217 @@ import 'conversion_screen.dart';
 import '../services/user_service.dart';
 import '../services/wallet_service.dart';
 import '../utils/websocket_test.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
+
+// Custom Crypto-themed Refresh Indicator
+class CryptoRefreshIndicator extends StatefulWidget {
+  final Widget child;
+  final Future<void> Function() onRefresh;
+
+  const CryptoRefreshIndicator({
+    super.key,
+    required this.child,
+    required this.onRefresh,
+  });
+
+  @override
+  State<CryptoRefreshIndicator> createState() => _CryptoRefreshIndicatorState();
+}
+
+class _CryptoRefreshIndicatorState extends State<CryptoRefreshIndicator>
+    with TickerProviderStateMixin {
+  late AnimationController _rotationController;
+  late AnimationController _pulseController;
+  late AnimationController _slideController;
+  double _dragExtent = 0.0;
+  bool _isRefreshing = false;
+  static const double _maxDrag = 120.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotationController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    _pulseController.dispose();
+    _slideController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() => _isRefreshing = true);
+    _rotationController.repeat();
+    _pulseController.repeat(reverse: true);
+    
+    await widget.onRefresh();
+    
+    if (mounted) {
+      setState(() {
+        _isRefreshing = false;
+        _dragExtent = 0.0;
+      });
+      _rotationController.stop();
+      _pulseController.stop();
+      _slideController.forward().then((_) => _slideController.reverse());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is ScrollStartNotification) {
+          if (notification.metrics.pixels <= 0) {
+            setState(() => _dragExtent = 0);
+          }
+        } else if (notification is OverscrollNotification) {
+          if (notification.overscroll < 0 && !_isRefreshing) {
+            setState(() {
+              _dragExtent = (_dragExtent - notification.overscroll).clamp(0.0, _maxDrag);
+            });
+            if (_dragExtent >= _maxDrag * 0.6) {
+              _rotationController.value = _dragExtent / _maxDrag;
+            }
+          }
+        } else if (notification is ScrollEndNotification) {
+          if (_dragExtent >= _maxDrag * 0.6 && !_isRefreshing) {
+            _handleRefresh();
+          } else if (!_isRefreshing) {
+            setState(() => _dragExtent = 0);
+          }
+        }
+        return false;
+      },
+      child: Stack(
+        children: [
+          widget.child,
+          if (_dragExtent > 0 || _isRefreshing)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: AnimatedBuilder(
+                animation: Listenable.merge([
+                  _rotationController,
+                  _pulseController,
+                  _slideController,
+                ]),
+                builder: (context, child) {
+                  double progress = _isRefreshing 
+                    ? 1.0 
+                    : (_dragExtent / _maxDrag).clamp(0.0, 1.0);
+                  
+                  double scale = _isRefreshing
+                    ? 0.8 + (_pulseController.value * 0.2)
+                    : 0.5 + (progress * 0.5);
+                  
+                  double opacity = progress.clamp(0.0, 1.0);
+                  
+                  double rotation = _isRefreshing
+                    ? _rotationController.value * 2 * pi
+                    : progress * 2 * pi;
+                  
+                  double slideOffset = _slideController.value * 20;
+                  
+                  return Container(
+                    height: 80 + slideOffset,
+                    alignment: Alignment.center,
+                    child: Opacity(
+                      opacity: opacity,
+                      child: Transform.scale(
+                        scale: scale,
+                        child: Transform.rotate(
+                          angle: rotation,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFF84BD00),
+                                  Color(0xFF6BA300),
+                                ],
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF84BD00).withOpacity(0.5 + (_pulseController.value * 0.3)),
+                                  blurRadius: 15 + (_pulseController.value * 10),
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Outer ring
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0D0D0D),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(0xFF84BD00).withOpacity(0.3),
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                                // Inner coin design
+                                const Icon(
+                                  Icons.currency_bitcoin,
+                                  color: Color(0xFF84BD00),
+                                  size: 22,
+                                ),
+                                // Rotating dots
+                                ...List.generate(4, (index) {
+                                  double angle = (index * pi / 2) + rotation;
+                                  return Transform.translate(
+                                    offset: Offset(
+                                      17 * cos(angle),
+                                      17 * sin(angle),
+                                    ),
+                                    child: Container(
+                                      width: 5,
+                                      height: 5,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF84BD00),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -59,8 +271,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchWalletBalance() async {
     try {
-      // Fetching total balance using the wallet/get API integrated method
-      final balance = await WalletService.getTotalUSDTBalance();
+      // Fetching AVAILABLE balance using the wallet/get API (user credentials se)
+      final balance = await WalletService.getTotalAvailableUSDTBalance();
       if (mounted) {
         setState(() {
           _totalBalance = balance;
@@ -146,9 +358,8 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildHeader(),
             Expanded(
-              child: RefreshIndicator(
+              child: CryptoRefreshIndicator(
                 onRefresh: _fetchInitialData,
-                color: const Color(0xFF84BD00),
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(
@@ -244,7 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               const Text(
-                'Total Balance',
+                'Available Balance',
                 style: TextStyle(color: Colors.white54, fontSize: 10),
               ),
               const SizedBox(width: 6),
@@ -449,7 +660,7 @@ class _HomeScreenState extends State<HomeScreen> {
       {'label': 'INR Deposit', 'icon': 'inrdeposit.png', 'iconData': Icons.currency_rupee},
       {'label': 'Withdraw', 'icon': 'withdrawicon.png', 'iconData': Icons.money},
       {'label': 'P2P', 'icon': '', 'iconData': Icons.people, 'customWidget': true},
-      {'label': 'Transfer', 'icon': '', 'iconData': Icons.swap_horiz, 'customWidget': true},
+      {'label': 'Transfer', 'icon': 'transfericon.png', 'iconData': Icons.swap_horiz, 'customWidget': true},
       {'label': 'Conversion', 'icon': '', 'iconData': Icons.currency_exchange, 'customWidget': true},
     ];
 
@@ -562,7 +773,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCryptoList() {
-    if (_isLoading) return const Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator(color: Color(0xFF84BD00)));
+    if (_isLoading) return const Padding(padding: EdgeInsets.all(40), child: Center(child: BitcoinLoadingIndicator(size: 40)));
     
     if (_cryptoData.isEmpty) {
       return const Center(

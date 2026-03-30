@@ -4,6 +4,8 @@ import 'register_screen.dart';
 import '../main_navigation.dart';
 import '../services/auth_service.dart';
 
+import '../widgets/bitcoin_loading_indicator.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -259,12 +261,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: _isLoading
                         ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
+                            width: 24,
+                            height: 24,
+                            child: BitcoinLoadingIndicator(size: 24),
                           )
                         : Text(_otpSent ? 'Verify OTP' : 'Send OTP', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),

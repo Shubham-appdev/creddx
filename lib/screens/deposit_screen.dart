@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'deposit_address_screen.dart';
 import '../services/wallet_service.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
 
 class DepositScreen extends StatefulWidget {
   const DepositScreen({super.key});
@@ -104,7 +105,7 @@ class _DepositScreenState extends State<DepositScreen> {
         centerTitle: true,
       ),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFF84BD00)))
+        ? const Center(child: BitcoinLoadingIndicator(size: 40))
         : _coins.isEmpty 
           ? Center(
               child: Column(

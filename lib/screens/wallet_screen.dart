@@ -7,6 +7,7 @@ import 'deposit_screen.dart';
 import 'internal_transfer_screen.dart';
 import 'wallet_history_screen.dart';
 import '../services/wallet_service.dart';
+import '../widgets/bitcoin_loading_indicator.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -185,7 +186,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF84BD00)))
+          ? const Center(child: BitcoinLoadingIndicator(size: 40))
           : RefreshIndicator(
               onRefresh: _fetchWalletData,
               color: const Color(0xFF84BD00),
